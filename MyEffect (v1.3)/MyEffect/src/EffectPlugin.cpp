@@ -96,20 +96,17 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 	const float* pfInBuffer[2] = { inputBuffers[0], inputBuffers[1] };
     float *pfOutBuffer[2] = { outputBuffers[0], outputBuffers[1] };
     
-    fSampleRate = getSampleRate();
-    
-    signed int iBufferReadPos;
+    del.fSampleRate = fSampleRate = getSampleRate();
 
     float fInputGain = pow(parameters[0], 3.0f);
-	float fDelayTime = parameters[1];
-	float fFeedbackGain = parameters[2];
-	float fOutputGain = parameters[3];
+	float fDelayTime = pow(parameters[1], 3.0f);
+	float fFeedbackGain = pow(parameters[2], 3.0f);
+	float fOutputGain = pow(parameters[3], 3.0f);
     
     while(numSamples--)
     {
 
-        iBufferReadPos = iBufferWritePos - (fSampleRate * (1.0f / 4.0f)); // 0.25 seconds delay
-        if (iBufferReadPos < 0) iBufferReadPos += iBufferSize; // Wrap around if necessary
+        del.ReadPosition();
 
         for (int ch = 0; ch < 2; ch++)
         {
@@ -117,13 +114,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
             fIn[ch] = *pfInBuffer[ch]++;
 			fIn[ch] *= fInputGain; // Apply input gain
 
-			// Add your effect processing here
-			pfCircularBuffer[ch][iBufferWritePos] = fIn[ch]; // Write the input sample to the circular buffer
-
-			float fDelSig = fIn[ch] + (fDelSig * fFeedbackGain); // Read the delayed sample from the circular buffer
-			fDelSig *= fDelayTime;
-
-            fWet[ch] = fIn[ch] + fDelSig;
+			del.process(ch, fIn, fFeedbackGain, fDelayTime, fWet); // Process the sample through the delay effect
 
             fOut[ch] = fWet[ch] * fOutputGain; // Apply output gain
 
@@ -132,7 +123,6 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
             *pfOutBuffer[ch]++ = fOut[ch];
         }
 
-        iBufferWritePos++; // Increment the write position
-        if (iBufferWritePos >= iBufferSize) iBufferWritePos = 0; // Wrap around if necessary. Reset to 0 if the write position exceeds the buffer size
+		del.postProcess(); // Increment the write position in the circular buffer
     }
 }

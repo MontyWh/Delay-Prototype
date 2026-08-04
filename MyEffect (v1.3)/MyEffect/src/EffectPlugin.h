@@ -21,7 +21,7 @@ public:
 
     void setSampleRate(float sampleRate){ stk::Stk::setSampleRate(sampleRate); }
     float getSampleRate() const { return stk::Stk::sampleRate(); };
-    
+
     void process(const float** inputBuffers, float** outputBuffers, int numSamples);
     
     void presetLoaded(int iPresetNum, const char *sPresetName);
@@ -31,8 +31,7 @@ public:
 private:
     // Declare shared member variables here
 
-    float* pfCircularBuffer[2]; // Used to point to an arrary that acts as the circular buffer itself
-	int iBufferSize, iBufferWritePos; // Used to store the size of the circular buffer, and the current write position (arrary index) in the buffer
+    MyDelay del;
 
     float fSampleRate;
 };
