@@ -399,3 +399,7 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+/MyEffect (v1.3)/__MACOSX/Build
+/MyEffect (v1.3)/__MACOSX/MyEffect/include
+/MyEffect (v1.3)/MyEffect/include
+/MyEffect (v1.3)/Build
