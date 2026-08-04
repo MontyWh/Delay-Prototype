@@ -29,16 +29,10 @@ extern "C" {
         
         const Parameters CONTROLS = {
             //  name,       type,              min, max, initial, size
-            {   "Param 0",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 1",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 2",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 3",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 4",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 5",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 6",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 7",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 8",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 9",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
+            {   "Input Gain",  Parameter::SLIDER, 0.0, 1.0, 0.0, AUTO_SIZE  },
+            {   "Delay Time",  Parameter::ROTARY, 0.1, 0.8, 0.0, AUTO_SIZE  },
+            {   "Feedback Gain",  Parameter::ROTARY, 0.0, 0.7, 0.4, AUTO_SIZE  },
+            {   "Output Gain",  Parameter::SLIDER, 0.0, 1.0, 0.5, AUTO_SIZE  },
         };
 
         const Presets PRESETS = {
@@ -105,6 +99,11 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
     fSampleRate = getSampleRate();
     
     signed int iBufferReadPos;
+
+    float fInputGain = pow(parameters[0], 3.0f);
+	float fDelayTime = parameters[1];
+	float fFeedbackGain = parameters[2];
+	float fOutputGain = parameters[3];
     
     while(numSamples--)
     {
@@ -116,15 +115,17 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
         {
             // Get sample from input
             fIn[ch] = *pfInBuffer[ch]++;
+			fIn[ch] *= fInputGain; // Apply input gain
 
 			// Add your effect processing here
 			pfCircularBuffer[ch][iBufferWritePos] = fIn[ch]; // Write the input sample to the circular buffer
 
-			float fDelSig = pfCircularBuffer[ch][iBufferReadPos]; // Read the delayed sample from the circular buffer
-			fDelSig *= 0.2f; // Scale the delayed signal to 20% of its original amplitude
+			float fDelSig = fIn[ch] + (fDelSig * fFeedbackGain); // Read the delayed sample from the circular buffer
+			fDelSig *= fDelayTime;
+
             fWet[ch] = fIn[ch] + fDelSig;
 
-            fOut[ch] = fWet[ch];
+            fOut[ch] = fWet[ch] * fOutputGain; // Apply output gain
 
 
             // Copy result to output
