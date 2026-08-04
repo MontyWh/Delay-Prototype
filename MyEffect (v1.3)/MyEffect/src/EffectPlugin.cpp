@@ -56,12 +56,24 @@ MyEffect::MyEffect(const Parameters& parameters, const Presets& presets)
 : Effect(parameters, presets)
 {
     // Initialise member variables, etc.
+
+	iBufferSize = fSampleRate * 2; // 2 seconds of audio
+
+	for (int ch = 0; ch < 2; ch++)
+    {
+        pfCircularBuffer[ch] = new float[iBufferSize]; // Allocate memory for the circular buffer
+        
+        for (int i = 0; i < iBufferSize; i++) pfCircularBuffer[ch][i] = 0.0f; // Initialise the circular buffer to zero
+    }
+
+    iBufferWritePos = 0; // Reset the write position to the start of the buffer
 }
 
 // Destructor: called when the effect is terminated / unloaded
 MyEffect::~MyEffect()
 {
     // Put your own additional clean up code here (e.g. free memory)
+    for (int ch = 0; ch < 2; ch++) delete[] pfCircularBuffer[ch];
 }
 
 // EVENT HANDLERS: handle different user input (button presses, preset selection, drop menus)
@@ -86,24 +98,40 @@ void MyEffect::buttonPressed(int iButton)
 // (inputBuffer contains the input audio, and processed samples should be stored in outputBuffer)
 void MyEffect::process(const float** inputBuffers, float** outputBuffers, int numSamples)
 {
-    float fIn0, fIn1, fOut0 = 0, fOut1 = 0;
-    const float *pfInBuffer0 = inputBuffers[0], *pfInBuffer1 = inputBuffers[1];
-    float *pfOutBuffer0 = outputBuffers[0], *pfOutBuffer1 = outputBuffers[1];
+   	float fWet[2], fIn[2], fOut[2] = { 0, 0, };
+	const float* pfInBuffer[2] = { inputBuffers[0], inputBuffers[1] };
+    float *pfOutBuffer[2] = { outputBuffers[0], outputBuffers[1] };
     
-    //float fGain = parameters[0];
+    fSampleRate = getSampleRate();
+    
+    signed int iBufferReadPos;
     
     while(numSamples--)
     {
-        // Get sample from input
-        fIn0 = *pfInBuffer0++;
-        fIn1 = *pfInBuffer1++;
-        
-        // Add your effect processing here
-        fOut0 = fIn0;
-        fOut1 = fIn1;
-        
-        // Copy result to output
-        *pfOutBuffer0++ = fOut0;
-        *pfOutBuffer1++ = fOut1;
+
+        iBufferReadPos = iBufferWritePos - (fSampleRate * (1.0f / 4.0f)); // 0.25 seconds delay
+        if (iBufferReadPos < 0) iBufferReadPos += iBufferSize; // Wrap around if necessary
+
+        for (int ch = 0; ch < 2; ch++)
+        {
+            // Get sample from input
+            fIn[ch] = *pfInBuffer[ch]++;
+
+			// Add your effect processing here
+			pfCircularBuffer[ch][iBufferWritePos] = fIn[ch]; // Write the input sample to the circular buffer
+
+			float fDelSig = pfCircularBuffer[ch][iBufferReadPos]; // Read the delayed sample from the circular buffer
+			fDelSig *= 0.2f; // Scale the delayed signal to 20% of its original amplitude
+            fWet[ch] = fIn[ch] + fDelSig;
+
+            fOut[ch] = fWet[ch];
+
+
+            // Copy result to output
+            *pfOutBuffer[ch]++ = fOut[ch];
+        }
+
+        iBufferWritePos++; // Increment the write position
+        if (iBufferWritePos >= iBufferSize) iBufferWritePos = 0; // Wrap around if necessary. Reset to 0 if the write position exceeds the buffer size
     }
 }
