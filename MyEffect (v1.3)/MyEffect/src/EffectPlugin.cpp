@@ -30,9 +30,11 @@ extern "C" {
         const Parameters CONTROLS = {
             //  name,       type,              min, max, initial, size
             {   "Input Gain",  Parameter::SLIDER, 0.0, 1.0, 0.5, AUTO_SIZE  },
-            {   "Delay Time",  Parameter::ROTARY, 0.1, 0.8, 0.4, AUTO_SIZE  },
-            {   "Feedback Gain",  Parameter::ROTARY, 0.0, 0.7, 0.4, AUTO_SIZE  },
-            {   "Mix",  Parameter::ROTARY, 0.0, 100.0, 50.0, AUTO_SIZE  },
+            {   "Delay Time 1",  Parameter::ROTARY, 0.001, 0.1, 0.025, AUTO_SIZE  },
+			{   "Delay Time 2",  Parameter::ROTARY, 0.001, 0.1, 0.05, AUTO_SIZE  },
+			{   "Delay Time 3",  Parameter::ROTARY, 0.001, 0.1, 0.075, AUTO_SIZE  },
+            {   "Feedback Gain",  Parameter::ROTARY, 0.0, 0.25, 0.125, AUTO_SIZE  },
+            {   "Mix",  Parameter::ROTARY, 0.0, 100.0, 25.0, AUTO_SIZE  },
             {   "Output Gain",  Parameter::SLIDER, 0.0, 1.0, 0.5, AUTO_SIZE  },
         };
 
@@ -52,7 +54,10 @@ MyEffect::MyEffect(const Parameters& parameters, const Presets& presets)
 {
 	// Initialise member variables, etc.
 	fSampleRate = getSampleRate();
-	del.initialiseBuffer(fSampleRate);
+	for (int ch = 0; ch < 2; ch++)
+	{
+		del[ch].initialiseBuffer(fSampleRate);
+	}
 }
 
 // Destructor: called when the effect is terminated / unloaded
@@ -83,36 +88,40 @@ void MyEffect::buttonPressed(int iButton)
 // (inputBuffer contains the input audio, and processed samples should be stored in outputBuffer)
 void MyEffect::process(const float** inputBuffers, float** outputBuffers, int numSamples)
 {
-   	float fWet[2], fIn[2], fOut[2] = { 0, 0, };
+	float fWet[2], fIn[2], fOut[2] = { 0, 0, };
 	const float* pfInBuffer[2] = { inputBuffers[0], inputBuffers[1] };
-    float *pfOutBuffer[2] = { outputBuffers[0], outputBuffers[1] };
-    
+	float *pfOutBuffer[2] = { outputBuffers[0], outputBuffers[1] };
 
 	float fInputGain = pow(parameters[0], 3.0f);
-	del.getDelayParameters(parameters);
-	float fMix = parameters[3];
-	float fOutputGain = parameters[4];
-    
-    while(numSamples--)
-    {
+	float fDelayTimes[3] = { parameters[1] * 10.0f, parameters[2] * 10.0f, parameters[3] * 10.0f };
+	float fFeedbackGain = parameters[4];
+	float fMix = parameters[5] / 100.0f; // Convert from 0-100 to 0-1
+	float fOutputGain = parameters[6];
 
-        del.iBufferReadPos = del.readBufferPosition(fSampleRate);
+	// Set delay parameters for all channels
+	for (int ch = 0; ch < 2; ch++)
+	{
+		del[ch].setDelayTimes(fDelayTimes, fFeedbackGain);
+	}
 
-        for (int ch = 0; ch < 2; ch++)
-        {
-            // Get sample from input
-            fIn[ch] = *pfInBuffer[ch]++;
+	while (numSamples--)
+	{
+		for (int ch = 0; ch < 2; ch++)
+		{
+			// Get sample from input
+			fIn[ch] = *pfInBuffer[ch]++;
 			fIn[ch] *= fInputGain; // Apply input gain
 
-			fWet[ch] = del.process(fIn[ch], ch);
+			// Process: sum 3 taps before feedback
+			fWet[ch] = del[ch].process(fIn[ch], fSampleRate);
 
-            fOut[ch] = fWet[ch] * fMix + fIn[ch] * (1.0f - fMix); // Apply mix
-            fOut[ch] *= fOutputGain; // Apply output gain
+			fOut[ch] = fWet[ch] * fMix + fIn[ch] * (1.0f - fMix); // Apply mix
+			fOut[ch] *= fOutputGain; // Apply output gain
 
-            // Copy result to output
-            *pfOutBuffer[ch]++ = fOut[ch];
-        }
+			// Copy result to output
+			*pfOutBuffer[ch]++ = fOut[ch];
 
-        del.postProcess();
-    }
+			del[ch].postProcess();
+		}
+	}
 }

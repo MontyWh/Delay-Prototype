@@ -12,73 +12,70 @@ class MyDelay
 public:
     MyDelay()
     {
-        pfCircularBuffer[0] = nullptr;
-        pfCircularBuffer[1] = nullptr;
+        pfCircularBuffer = nullptr;
 
         iBufferSize = 0;
         iBufferWritePos = 0;
-        iBufferReadPos = 0;
+
+        fDelayTimes[0] = 0.0f;
+        fDelayTimes[1] = 0.0f;
+        fDelayTimes[2] = 0.0f;
+        fFeedbackGain = 0.0f;
     }
 
     ~MyDelay()
     {
-        for (int ch = 0; ch < 2; ch++) delete[] pfCircularBuffer[ch];
+        delete[] pfCircularBuffer;
     }
 
-    template <typename ParameterContainer>
-    void getDelayParameters(const ParameterContainer& parameters)
+    void setDelayTimes(float* delayTimes, float feedbackGain)
     {
-        fDelayTime = parameters[1];
-        fFeedbackGain = parameters[2];
+        fDelayTimes[0] = delayTimes[0];
+        fDelayTimes[1] = delayTimes[1];
+        fDelayTimes[2] = delayTimes[2];
+        fFeedbackGain = feedbackGain;
     }
 
     void initialiseBuffer(float fSampleRate)
     {
         iBufferSize = fSampleRate * 2; // 2 seconds of audio
 
-        for (int ch = 0; ch < 2; ch++)
-        {
-            pfCircularBuffer[ch] = new float[iBufferSize]; // Allocate memory for the circular buffer
+        pfCircularBuffer = new float[iBufferSize]; // Allocate memory for the circular buffer
 
-            for (int i = 0; i < iBufferSize; i++) pfCircularBuffer[ch][i] = 0.0f; // Initialise the circular buffer to zero
-        }
+        for (int i = 0; i < iBufferSize; i++) pfCircularBuffer[i] = 0.0f; // Initialise the circular buffer to zero
 
         iBufferWritePos = 0; // Reset the write position to the start of the buffer
     }
 
-    int readBufferPosition(float fSampleRate)
+    float process(float fIn, float fSampleRate)
     {
-        signed int iBufferReadPos;
+        // Sum all 3 taps
+        float fSummedTaps = 0.0f;
+        for (int d = 0; d < 3; d++)
+        {
+            int readPos = iBufferWritePos - (int)(fSampleRate * fDelayTimes[d]);
+            if (readPos < 0) readPos += iBufferSize;
 
-        iBufferReadPos = iBufferWritePos - (fSampleRate * fDelayTime); // Use the delay time parameter
-        if (iBufferReadPos < 0) iBufferReadPos += iBufferSize; // Wrap around if necessary
+            fSummedTaps += pfCircularBuffer[readPos];
+        }
 
-        return iBufferReadPos;
-    }
+        // Apply feedback to summed taps BEFORE writing
+        pfCircularBuffer[iBufferWritePos] = fIn + (fSummedTaps * fFeedbackGain);
 
-    float process(float fIn, int ch)
-    {
-        // Add your effect processing here
-        float fDelSig = pfCircularBuffer[ch][iBufferReadPos]; // Read the delayed sample from the circular buffer
-
-        pfCircularBuffer[ch][iBufferWritePos] = fIn + (fDelSig * fFeedbackGain); // Write input + feedback to circular buffer
-
-        return fIn + fDelSig;
+        return fIn + fSummedTaps;
     }
 
     void postProcess()
     {
         iBufferWritePos++; // Increment the write position
-        if (iBufferWritePos >= iBufferSize) iBufferWritePos = 0; // Wrap around if necessary. Reset to 0 if the write position exceeds the buffer size
+        if (iBufferWritePos >= iBufferSize) iBufferWritePos = 0; // Wrap around if necessary
     }
 
-    signed int iBufferReadPos;
-
 protected:
-    float fDelayTime;
+    float fDelayTimes[3];
     float fFeedbackGain;
 
 private:
-    float* pfCircularBuffer[2]; // Used to point to an arrary that acts as the circular buffer itself
-    int iBufferSize, iBufferWritePos; // Used to store the size of the circular buffer, and the current write position (arrary index) in the buffer
+    float* pfCircularBuffer;
+    int iBufferSize, iBufferWritePos;
 };

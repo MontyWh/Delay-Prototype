@@ -31,7 +31,7 @@ public:
 private:
 	// Declare shared member variables here
 
-	MyDelay del;
+	MyDelay del[2];
 
 	float fSampleRate;
 };
