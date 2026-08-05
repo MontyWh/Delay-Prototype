@@ -56,6 +56,10 @@ MyEffect::MyEffect(const Parameters& parameters, const Presets& presets)
 : Effect(parameters, presets)
 {
     // Initialise member variables, etc.
+
+    filter.set(0.5f);
+
+
 }
 
 // Destructor: called when the effect is terminated / unloaded
@@ -86,24 +90,25 @@ void MyEffect::buttonPressed(int iButton)
 // (inputBuffer contains the input audio, and processed samples should be stored in outputBuffer)
 void MyEffect::process(const float** inputBuffers, float** outputBuffers, int numSamples)
 {
-    float fIn0, fIn1, fOut0 = 0, fOut1 = 0;
-    const float *pfInBuffer0 = inputBuffers[0], *pfInBuffer1 = inputBuffers[1];
-    float *pfOutBuffer0 = outputBuffers[0], *pfOutBuffer1 = outputBuffers[1];
+    float fIn[2], fOut[2] = {0, 0};
+    const float *pfInBuffer[2] = { inputBuffers[0], inputBuffers[1] };
+    float *pfOutBuffer[2] = { outputBuffers[0], outputBuffers[1] };
     
     //float fGain = parameters[0];
-    
-    while(numSamples--)
+
+    for (int ch = 0; ch < 2; ch++)
     {
-        // Get sample from input
-        fIn0 = *pfInBuffer0++;
-        fIn1 = *pfInBuffer1++;
-        
-        // Add your effect processing here
-        fOut0 = fIn0;
-        fOut1 = fIn1;
-        
-        // Copy result to output
-        *pfOutBuffer0++ = fOut0;
-        *pfOutBuffer1++ = fOut1;
+
+        while (numSamples--)
+        {
+            // Get sample from input
+            fIn[ch] = *pfInBuffer[ch]++;
+
+            // Add your effect processing here
+            fOut[ch] = fIn[ch];
+
+            // Copy result to output
+            *pfOutBuffer[ch]++ = fOut[ch];
+        }
     }
 }
