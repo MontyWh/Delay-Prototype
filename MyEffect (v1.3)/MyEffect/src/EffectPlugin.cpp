@@ -29,9 +29,10 @@ extern "C" {
         
         const Parameters CONTROLS = {
             //  name,       type,              min, max, initial, size
-            {   "Input Gain",  Parameter::SLIDER, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Delay Time",  Parameter::ROTARY, 0.1, 0.8, 0.0, AUTO_SIZE  },
+            {   "Input Gain",  Parameter::SLIDER, 0.0, 1.0, 0.5, AUTO_SIZE  },
+            {   "Delay Time",  Parameter::ROTARY, 0.1, 0.8, 0.4, AUTO_SIZE  },
             {   "Feedback Gain",  Parameter::ROTARY, 0.0, 0.7, 0.4, AUTO_SIZE  },
+            {   "Mix",  Parameter::ROTARY, 0.0, 100.0, 50.0, AUTO_SIZE  },
             {   "Output Gain",  Parameter::SLIDER, 0.0, 1.0, 0.5, AUTO_SIZE  },
         };
 
@@ -49,25 +50,15 @@ extern "C" {
 MyEffect::MyEffect(const Parameters& parameters, const Presets& presets)
 : Effect(parameters, presets)
 {
-    // Initialise member variables, etc.
-
-	iBufferSize = fSampleRate * 2; // 2 seconds of audio
-
-	for (int ch = 0; ch < 2; ch++)
-    {
-        pfCircularBuffer[ch] = new float[iBufferSize]; // Allocate memory for the circular buffer
-        
-        for (int i = 0; i < iBufferSize; i++) pfCircularBuffer[ch][i] = 0.0f; // Initialise the circular buffer to zero
-    }
-
-    iBufferWritePos = 0; // Reset the write position to the start of the buffer
+	// Initialise member variables, etc.
+	fSampleRate = getSampleRate();
+	del.initialiseBuffer(fSampleRate);
 }
 
 // Destructor: called when the effect is terminated / unloaded
 MyEffect::~MyEffect()
 {
     // Put your own additional clean up code here (e.g. free memory)
-    for (int ch = 0; ch < 2; ch++) delete[] pfCircularBuffer[ch];
 }
 
 // EVENT HANDLERS: handle different user input (button presses, preset selection, drop menus)
@@ -96,17 +87,16 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 	const float* pfInBuffer[2] = { inputBuffers[0], inputBuffers[1] };
     float *pfOutBuffer[2] = { outputBuffers[0], outputBuffers[1] };
     
-    del.fSampleRate = fSampleRate = getSampleRate();
 
-    float fInputGain = pow(parameters[0], 3.0f);
-	float fDelayTime = pow(parameters[1], 3.0f);
-	float fFeedbackGain = pow(parameters[2], 3.0f);
-	float fOutputGain = pow(parameters[3], 3.0f);
+	float fInputGain = pow(parameters[0], 3.0f);
+	del.getDelayParameters(parameters);
+	float fMix = parameters[3];
+	float fOutputGain = parameters[4];
     
     while(numSamples--)
     {
 
-        del.ReadPosition();
+        del.iBufferReadPos = del.readBufferPosition(fSampleRate);
 
         for (int ch = 0; ch < 2; ch++)
         {
@@ -114,15 +104,15 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
             fIn[ch] = *pfInBuffer[ch]++;
 			fIn[ch] *= fInputGain; // Apply input gain
 
-			del.process(ch, fIn, fFeedbackGain, fDelayTime, fWet); // Process the sample through the delay effect
+			fWet[ch] = del.process(fIn[ch], ch);
 
-            fOut[ch] = fWet[ch] * fOutputGain; // Apply output gain
-
+            fOut[ch] = fWet[ch] * fMix + fIn[ch] * (1.0f - fMix); // Apply mix
+            fOut[ch] *= fOutputGain; // Apply output gain
 
             // Copy result to output
             *pfOutBuffer[ch]++ = fOut[ch];
         }
 
-		del.postProcess(); // Increment the write position in the circular buffer
+        del.postProcess();
     }
 }

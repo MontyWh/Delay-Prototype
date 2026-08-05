@@ -5,26 +5,65 @@
 //  This file is a workspace for developing new DSP objects or functions to use in your plugin.
 //
 
+#pragma once
 
 class MyDelay
 {
 public:
-
-    void ReadPosition()
+    MyDelay()
     {
-        iBufferReadPos = iBufferWritePos - (fSampleRate * (1.0f / 4.0f)); // 0.25 seconds delay
-        if (iBufferReadPos < 0) iBufferReadPos += iBufferSize; // Wrap around if necessary
+        pfCircularBuffer[0] = nullptr;
+        pfCircularBuffer[1] = nullptr;
+
+        iBufferSize = 0;
+        iBufferWritePos = 0;
+        iBufferReadPos = 0;
     }
 
-    void process(int ch, float  fIn[2], float fFeedbackGain, float fDelayTime, float  fWet[2])
+    ~MyDelay()
+    {
+        for (int ch = 0; ch < 2; ch++) delete[] pfCircularBuffer[ch];
+    }
+
+    template <typename ParameterContainer>
+    void getDelayParameters(const ParameterContainer& parameters)
+    {
+        fDelayTime = parameters[1];
+        fFeedbackGain = parameters[2];
+    }
+
+    void initialiseBuffer(float fSampleRate)
+    {
+        iBufferSize = fSampleRate * 2; // 2 seconds of audio
+
+        for (int ch = 0; ch < 2; ch++)
+        {
+            pfCircularBuffer[ch] = new float[iBufferSize]; // Allocate memory for the circular buffer
+
+            for (int i = 0; i < iBufferSize; i++) pfCircularBuffer[ch][i] = 0.0f; // Initialise the circular buffer to zero
+        }
+
+        iBufferWritePos = 0; // Reset the write position to the start of the buffer
+    }
+
+    int readBufferPosition(float fSampleRate)
+    {
+        signed int iBufferReadPos;
+
+        iBufferReadPos = iBufferWritePos - (fSampleRate * fDelayTime); // Use the delay time parameter
+        if (iBufferReadPos < 0) iBufferReadPos += iBufferSize; // Wrap around if necessary
+
+        return iBufferReadPos;
+    }
+
+    float process(float fIn, int ch)
     {
         // Add your effect processing here
-        pfCircularBuffer[ch][iBufferWritePos] = fIn[ch]; // Write the input sample to the circular buffer
+        float fDelSig = pfCircularBuffer[ch][iBufferReadPos]; // Read the delayed sample from the circular buffer
 
-        float fDelSig = fIn[ch] + (fDelSig * fFeedbackGain); // Read the delayed sample from the circular buffer
-        fDelSig *= fDelayTime;
+        pfCircularBuffer[ch][iBufferWritePos] = fIn + (fDelSig * fFeedbackGain); // Write input + feedback to circular buffer
 
-        fWet[ch] = fIn[ch] + fDelSig;
+        return fIn + fDelSig;
     }
 
     void postProcess()
@@ -33,8 +72,11 @@ public:
         if (iBufferWritePos >= iBufferSize) iBufferWritePos = 0; // Wrap around if necessary. Reset to 0 if the write position exceeds the buffer size
     }
 
-    float fSampleRate;
     signed int iBufferReadPos;
+
+protected:
+    float fDelayTime;
+    float fFeedbackGain;
 
 private:
     float* pfCircularBuffer[2]; // Used to point to an arrary that acts as the circular buffer itself

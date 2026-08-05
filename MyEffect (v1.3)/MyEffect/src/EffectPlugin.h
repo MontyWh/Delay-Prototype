@@ -21,7 +21,7 @@ public:
 
     void setSampleRate(float sampleRate){ stk::Stk::setSampleRate(sampleRate); }
     float getSampleRate() const { return stk::Stk::sampleRate(); };
-
+    
     void process(const float** inputBuffers, float** outputBuffers, int numSamples);
     
     void presetLoaded(int iPresetNum, const char *sPresetName);
@@ -29,9 +29,9 @@ public:
     void buttonPressed(int iButton);
 
 private:
-    // Declare shared member variables here
+	// Declare shared member variables here
 
-    MyDelay del;
+	MyDelay del;
 
-    float fSampleRate;
+	float fSampleRate;
 };
