@@ -31,5 +31,5 @@ public:
 private:
     // Declare shared member variables here
 
-    MyFilter filter;
+    MyFilter filter[2];
 };

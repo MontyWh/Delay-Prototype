@@ -12,18 +12,22 @@ public:
 	void set(float coeff)
 	{
 		// Initialise your filter variables here
-
+		currentACoeff = coeff;
 		previousBCoeff = 1 - currentACoeff;
 	}
 
 	float process(float input)
 	{
-		// Filter individual samples here
+		// Filter individual samples here - 𝑦0 = 𝑎𝑥0 + 𝑏𝑦-1
+		float fOutput = (input * currentACoeff) + (previousOutput * previousBCoeff);
+		previousOutput = fOutput;  // Store for next sample
+		return fOutput;
 	}
 
 private:
 	// Declare your internal filter variables here
 
 	float currentACoeff;
-	float previousBCoeff;
+	float previousBCoeff = 0;
+	float previousOutput = 0;  // Stores y-1
 };

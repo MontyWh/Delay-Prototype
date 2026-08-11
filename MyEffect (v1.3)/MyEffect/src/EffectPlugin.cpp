@@ -29,16 +29,9 @@ extern "C" {
         
         const Parameters CONTROLS = {
             //  name,       type,              min, max, initial, size
-            {   "Param 0",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 1",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 2",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 3",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 4",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 5",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 6",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 7",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 8",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
-            {   "Param 9",  Parameter::ROTARY, 0.0, 1.0, 0.0, AUTO_SIZE  },
+            {   "Input Gain",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE  },
+            {   "Filter Cutoff",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE  },
+            {   "Output Gain",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE  },
         };
 
         const Presets PRESETS = {
@@ -56,10 +49,6 @@ MyEffect::MyEffect(const Parameters& parameters, const Presets& presets)
 : Effect(parameters, presets)
 {
     // Initialise member variables, etc.
-
-    filter.set(0.5f);
-
-
 }
 
 // Destructor: called when the effect is terminated / unloaded
@@ -96,19 +85,21 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
     
     //float fGain = parameters[0];
 
-    for (int ch = 0; ch < 2; ch++)
-    {
+	for (int i = 0; i < numSamples; i++)
+	{
+		for (int ch = 0; ch < 2; ch++)
+		{
+			// Get sample from input
+			fIn[ch] = *pfInBuffer[ch]++;
 
-        while (numSamples--)
-        {
-            // Get sample from input
-            fIn[ch] = *pfInBuffer[ch]++;
+			// Add your effect processing here#
+            filter[ch].set(parameters[1]);
+			float fWet = filter[ch].process(fIn[ch] * parameters[0]);
 
-            // Add your effect processing here
-            fOut[ch] = fIn[ch];
+			fOut[ch] = fWet;
 
-            // Copy result to output
-            *pfOutBuffer[ch]++ = fOut[ch];
-        }
-    }
+			// Copy result to output
+			*pfOutBuffer[ch]++ = fOut[ch];
+		}
+	}
 }
