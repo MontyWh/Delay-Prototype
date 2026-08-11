@@ -16,6 +16,13 @@ public:
 		previousBCoeff = 1 - currentACoeff;
 	}
 
+	float getCutoff(float sampleRate)
+	{
+		float fOutput = acos(1 - (pow(currentACoeff, 2 / (2 * previousBCoeff))) * (sampleRate / (2 * M_PI))); // Calculate cutoff frequency based on currentACoeff and previousBCoeff
+		printf("Cutoff: %f\n", fOutput);
+		return fOutput;
+	}
+
 	float process(float input)
 	{
 		// Filter individual samples here - 𝑦0 = 𝑎𝑥0 + 𝑏𝑦-1

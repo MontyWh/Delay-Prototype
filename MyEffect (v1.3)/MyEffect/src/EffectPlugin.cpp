@@ -90,6 +90,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
     for (int ch = 0; ch < 2; ch++)
     {
         filter[ch].set(fCutoff);
+        filter[ch].getCutoff(getSampleRate());
         secondOrderFilter[ch].set(fCutoff);
     }
 
