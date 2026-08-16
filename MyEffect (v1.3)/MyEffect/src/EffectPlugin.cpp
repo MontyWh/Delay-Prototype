@@ -30,7 +30,8 @@ extern "C" {
         const Parameters CONTROLS = {
             //  name,       type,              min, max, initial, size
             {   "Input Gain",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE  },
-            {   "Filter Cutoff",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE  },
+            {   "LPF Cutoff",  Parameter::ROTARY, 0.0, 1.0, 0.75, AUTO_SIZE  },
+            {   "HPF Cutoff",  Parameter::ROTARY, 0.0, 1.0, 0.75, AUTO_SIZE  },
             {   "Output Gain",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE  },
         };
 
@@ -84,10 +85,12 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
     float *pfOutBuffer[2] = { outputBuffers[0], outputBuffers[1] };
     
     float fInGain = parameters[0];
-	float fCutoff = parameters[1];
-	float fOutGain = parameters[2];
+	float fLpfCutoff = parameters[1];
+	float fHpfCutoff = 1.0f - parameters[2];
+	float fOutGain = parameters[3];
 
-    for (int ch = 0; ch < 2; ch++) for (int i = 0; i < 4; i++) filter[ch][i].set(fCutoff);
+    for (int ch = 0; ch < 2; ch++) for (int i = 0; i < 4; i++) LPF[ch][i].set(fLpfCutoff);
+    for (int ch = 0; ch < 2; ch++) for (int i = 0; i < 4; i++) HPF[ch][i].set(fHpfCutoff);
 
 	for (int i = 0; i < numSamples; i++)
 	{
@@ -98,7 +101,8 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 			// Add your effect processing here#
 			float fWet = fIn[ch] * fInGain;
-			for (int i = 0; i < 4; i++) filter[ch][i].process(fWet);
+			for (int i = 0; i < 4; i++) LPF[ch][i].process(fWet);
+			for (int i = 0; i < 4; i++) HPF[ch][i].process(fWet);
 
 			fOut[ch] = fWet * fOutGain;
 
