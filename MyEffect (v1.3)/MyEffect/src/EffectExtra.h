@@ -64,6 +64,24 @@ public:
 		MyIirFilter firstOrderFilter;
 		MyIirFilter secondOrderFilter;
 	};
+
+	class FilterStages
+	{
+	public:
+
+		void set(float fCutoff)
+		{
+			for (int i = 0; i < 4; ++i) biQuadFilter[i].set(fCutoff);
+		}
+
+		void process(float& fWet)
+		{
+			for (int i = 0; i < 4; ++i) biQuadFilter[i].process(fWet); // shallow -6dB firstOrderFilter slope. Lets through significant frequency content above the cutoff.
+		}
+
+	private:
+		MyBiQuadFilter biQuadFilter[4];
+	};
 };
 
 class MyHighPassFilter
@@ -125,5 +143,83 @@ public:
 	private:
 		MyIirFilter firstOrderFilter;
 		MyIirFilter secondOrderFilter;
+	};
+
+	class FilterStages
+	{
+	public:
+
+		void set(float fCutoff)
+		{
+			for (int i = 0; i < 4; ++i) biQuadFilter[i].set(fCutoff);
+		}
+
+		void process(float& fWet)
+		{
+			for (int i = 0; i < 4; ++i) biQuadFilter[i].process(fWet); // shallow -6dB firstOrderFilter slope. Lets through significant frequency content above the cutoff.
+		}
+
+	private:
+		MyBiQuadFilter biQuadFilter[4];
+	};
+};
+
+class MyBandPassFilter
+{
+public:
+
+	class MyBiQuadFilter
+	{
+	public:
+
+		void set(float fFrequency, float fQ)
+		{
+			// Calculate band edges from centre frequency and Q value
+			if (fQ < 0.001f) fQ = 0.001f;
+			float fBandwidth = fFrequency / fQ;
+			float fLowCutoff = fFrequency - (fBandwidth * 0.5f);
+			float fHighCutoff = fFrequency + (fBandwidth * 0.5f);
+
+			if (fLowCutoff < 0.0f) fLowCutoff = 0.0f;
+			if (fHighCutoff > 1.0f) fHighCutoff = 1.0f;
+			if (fHighCutoff < fLowCutoff) fHighCutoff = fLowCutoff;
+
+			for (int i = 0; i < 4; ++i)
+			{
+				HPF[i].set(fLowCutoff);
+				LPF[i].set(fHighCutoff);
+			}
+		}
+
+		void process(float& fWet)
+		{
+			// High-pass first to remove low-frequency content below the band.
+			for (int i = 0; i < 4; ++i) HPF[i].process(fWet);
+
+			// Low-pass second to remove high-frequency content above the band.
+			for (int i = 0; i < 4; ++i) LPF[i].process(fWet);
+		}
+
+	private:
+		MyHighPassFilter::MyBiQuadFilter HPF[4];
+		MyLowPassFilter::MyBiQuadFilter LPF[4];
+	};
+
+	class FilterStages
+	{
+	public:
+
+		void set(float fFrequency, float fQ)
+		{
+			for (int i = 0; i < 4; ++i) biQuadFilter[i].set(fFrequency, fQ);
+		}
+
+		void process(float& fWet)
+		{
+			for (int i = 0; i < 4; ++i) biQuadFilter[i].process(fWet); // shallow -6dB firstOrderFilter slope. Lets through significant frequency content above the cutoff.
+		}
+
+	private:
+		MyBiQuadFilter biQuadFilter[4];
 	};
 };

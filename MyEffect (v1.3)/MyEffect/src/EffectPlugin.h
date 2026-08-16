@@ -31,7 +31,7 @@ public:
 private:
     // Declare shared member variables here
 
-	MyLowPassFilter::MyBiQuadFilter LPF[2][4]; // Stereo 4-pole lowpass filter (2 channels, 4 filters per channel)
-
-	MyHighPassFilter::MyBiQuadFilter HPF[2][4]; // Stereo 4-pole highpass filter (2 channels, 4 filters per channel)
+	MyLowPassFilter::MyBiQuadFilter LPF[2]; // Stereo 4-pole lowpass filter (2 channels, 4 filters per channel)
+	MyBandPassFilter::MyBiQuadFilter BPF[2]; // Stereo 4-pole bandpass filter (2 channels, 4 filters per channel)
+	MyHighPassFilter::MyBiQuadFilter HPF[2]; // Stereo 4-pole highpass filter (2 channels, 4 filters per channel)
 };

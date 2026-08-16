@@ -30,15 +30,27 @@ extern "C" {
         const Parameters CONTROLS = {
             //  name,       type,              min, max, initial, size
             {   "Input Gain",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE  },
+
+            {   "LPF Gain",  Parameter::ROTARY, 0.0, 2.0, 1.0, AUTO_SIZE  },
             {   "LPF Cutoff",  Parameter::ROTARY, 0.0, 1.0, 0.75, AUTO_SIZE  },
+			{   "LPF On/Off",  Parameter::TOGGLE, 0.0, 1.0, 1.0, AUTO_SIZE  },
+
+            {   "BPF Gain",  Parameter::ROTARY, 0.0, 2.0, 1.0, AUTO_SIZE  },
+            {   "BPF Q",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE },
+            {   "BPF Frequency",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE },
+			{   "BPF On/Off",  Parameter::TOGGLE, 0.0, 1.0, 1.0, AUTO_SIZE },
+
+            {   "HPF Gain",  Parameter::ROTARY, 0.0, 2.0, 1.0, AUTO_SIZE  },
             {   "HPF Cutoff",  Parameter::ROTARY, 0.0, 1.0, 0.75, AUTO_SIZE  },
+			{   "HPF On/Off",  Parameter::TOGGLE, 0.0, 1.0, 1.0, AUTO_SIZE  },
+
             {   "Output Gain",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE  },
         };
 
         const Presets PRESETS = {
-            { "Preset 1", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { "Preset 2", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { "Preset 3", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { "Preset 1", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { "Preset 2", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { "Preset 3", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
         };
 
         return (APDI::Effect*)new MyEffect(CONTROLS, PRESETS);
@@ -85,12 +97,28 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
     float *pfOutBuffer[2] = { outputBuffers[0], outputBuffers[1] };
     
     float fInGain = parameters[0];
-	float fLpfCutoff = parameters[1];
-	float fHpfCutoff = 1.0f - parameters[2];
-	float fOutGain = parameters[3];
 
-    for (int ch = 0; ch < 2; ch++) for (int i = 0; i < 4; i++) LPF[ch][i].set(fLpfCutoff);
-    for (int ch = 0; ch < 2; ch++) for (int i = 0; i < 4; i++) HPF[ch][i].set(fHpfCutoff);
+	float fLpfGain = parameters[1];
+    float fLpfCutoff = parameters[2];
+	float fLpfOnOff = parameters[3];
+
+	float fBpfGain = parameters[4];
+	float fBpfQ = parameters[5];
+	float fBpfFrequency = parameters[6];
+	float fBpfOnOff = parameters[7];
+    
+	float fHpfGain = parameters[8];
+    float fHpfCutoff = parameters[9];
+	float fHpfOnOff = parameters[10];
+
+	float fOutGain = parameters[11];
+
+	for (int ch = 0; ch < 2; ch++)
+	{
+		LPF[ch].set(fLpfCutoff);
+		BPF[ch].set(fBpfFrequency, fBpfQ);
+		HPF[ch].set(fHpfCutoff);
+	}
 
 	for (int i = 0; i < numSamples; i++)
 	{
@@ -99,10 +127,24 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 			// Get sample from input
 			fIn[ch] = *pfInBuffer[ch]++;
 
-			// Add your effect processing here#
-			float fWet = fIn[ch] * fInGain;
-			for (int i = 0; i < 4; i++) LPF[ch][i].process(fWet);
-			for (int i = 0; i < 4; i++) HPF[ch][i].process(fWet);
+			// Add your effect processing here
+			float fWet = fIn[ch] * fInGain * 0.5f;
+
+			if (fLpfOnOff > 0.5f)
+			{
+				LPF[ch].process(fWet);
+				fWet *= fLpfGain;
+			}
+			if (fBpfOnOff > 0.5f)
+			{
+				BPF[ch].process(fWet);
+				fWet *= fBpfGain;
+			}
+			if (fHpfOnOff > 0.5f)
+			{
+				HPF[ch].process(fWet);
+				fWet *= fHpfGain;
+			}
 
 			fOut[ch] = fWet * fOutGain;
 
