@@ -31,6 +31,6 @@ public:
 private:
     // Declare shared member variables here
 
-    MyFilter filter[2];
-    MyFilter secondOrderFilter[2];
+    MyIirFilter filter[2];
+    MyIirFilter secondOrderFilter[2];
 };

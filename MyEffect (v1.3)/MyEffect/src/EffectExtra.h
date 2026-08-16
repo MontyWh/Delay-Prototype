@@ -6,7 +6,7 @@
 //
 
 
-class MyFilter
+class MyIirFilter
 {
 public:
 	void set(float coeff)
