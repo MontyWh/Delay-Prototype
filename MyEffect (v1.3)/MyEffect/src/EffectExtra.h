@@ -5,221 +5,497 @@
 //  This file is a workspace for developing new DSP objects or functions to use in your plugin.
 //
 
+#include <cmath>
 
-class MyLowPassFilter
+class MyFilters
 {
 public:
-
-	class MyIirFilter
+	void setupFilters(float fLpfCutoff, float fSampleRate, float fBpfFrequency, float fBpfQ, float fHpfCutoff)
 	{
-	public:
-		void set(float coeff)
+		for (int ch = 0; ch < 2; ch++)
 		{
-			// Initialise your firstOrderFilter variables here
-			fCurrentACoeff = coeff;
-			fPreviousBCoeff = 1.0f - fCurrentACoeff;
+			LPF[ch].set(fLpfCutoff, fSampleRate);
+			BPF[ch].set(fBpfFrequency, fBpfQ, fSampleRate);
+			HPF[ch].set(fHpfCutoff, fSampleRate);
 		}
+	}
 
-		float getCutoff(float sampleRate)
-		{
-			float fOutput = acos(1 - (pow(fCurrentACoeff, 2.0f / (2.0f * fPreviousBCoeff))) * (sampleRate / (2.0f * M_PI))); // Calculate cutoff frequency based on fCurrentACoeff and fPreviousBCoeff
-			printf("Cutoff: %f\n", fOutput);
-			return fOutput;
-		}
-
-		float process(float input)
-		{
-			// Filter individual samples here - 𝑦0 = 𝑎𝑥0 + 𝑏𝑦-1
-			// Y is the output, X is the input, a is the fCurrentACoeff, b is the fPreviousBCoeff, and y-1 is the previous output sample
-			float fOutput = (input * fCurrentACoeff) + (fPreviousOutput * fPreviousBCoeff);
-			fPreviousOutput = fOutput;  // Store for next sample
-			return fOutput;
-		}
-
-	private:
-		// Declare your internal firstOrderFilter variables here
-
-		float fCurrentACoeff;
-		float fPreviousBCoeff = 0.0f;
-		float fPreviousOutput = 0.0f;  // Stores y-1
-	};
-
-	class MyBiQuadFilter
+	void processFilters(float fLpfOnOff, float fInput, int ch, float fLpfGain, float fBpfOnOff, float fBpfGain, float fHpfOnOff, float fHpfGain, float& fWet)
 	{
-	public:
+		float fLpfBand = 0.0f;
+		float fBpfBand = 0.0f;
+		float fHpfBand = 0.0f;
+		int iBandCount = 0;
 
-		void set(float fCutoff)
+		if (fLpfOnOff > 0.5f)
 		{
-			firstOrderFilter.set(fCutoff);
-			secondOrderFilter.set(fCutoff);
+			fLpfBand = fInput;
+			LPF[ch].process(fLpfBand);
+			fLpfBand *= fLpfGain;
+			iBandCount++;
+		}
+		if (fBpfOnOff > 0.5f)
+		{
+			fBpfBand = fInput;
+			BPF[ch].process(fBpfBand);
+			fBpfBand *= fBpfGain;
+			iBandCount++;
+		}
+		if (fHpfOnOff > 0.5f)
+		{
+			fHpfBand = fInput;
+			HPF[ch].process(fHpfBand);
+			fHpfBand *= fHpfGain;
+			iBandCount++;
 		}
 
-		void process(float& fWet)
-		{
-			fWet = firstOrderFilter.process(fWet); // shallow -6dB firstOrderFilter slope. Lets through significant frequency content above the cutoff.
-			fWet = secondOrderFilter.process(fWet); // second order firstOrderFilter -12dB firstOrderFilter slope. Lets through less frequency content above the cutoff.
-		}
+		fWet = fLpfBand + fBpfBand + fHpfBand;
+		if (iBandCount > 0) fWet /= (float)iBandCount;
+		else fWet = fInput;
+	}
 
-	private:
-		MyIirFilter firstOrderFilter;
-		MyIirFilter secondOrderFilter;
-	};
-
-	class FilterStages
+	class MyLowPassFilter
 	{
 	public:
 
-		void set(float fCutoff)
+		class MyIirFilter
 		{
-			for (int i = 0; i < 4; ++i) biQuadFilter[i].set(fCutoff);
-		}
-
-		void process(float& fWet)
-		{
-			for (int i = 0; i < 4; ++i) biQuadFilter[i].process(fWet); // shallow -6dB firstOrderFilter slope. Lets through significant frequency content above the cutoff.
-		}
-
-	private:
-		MyBiQuadFilter biQuadFilter[4];
-	};
-};
-
-class MyHighPassFilter
-{
-public:
-
-	class MyIirFilter
-	{
-	public:
-		void set(float coeff)
-		{
-			// Initialise your firstOrderFilter variables here
-			fCurrentACoeff = coeff;
-			fPreviousBCoeff = 1.0f - fCurrentACoeff;
-		}
-
-		float getCutoff(float sampleRate)
-		{
-			float fOutput = acos(1 - (pow(fCurrentACoeff, 2.0f / (2.0f * fPreviousBCoeff))) * (sampleRate / (2.0f * M_PI))); // Calculate cutoff frequency based on fCurrentACoeff and fPreviousBCoeff
-			printf("Cutoff: %f\n", fOutput);
-			return fOutput;
-		}
-
-		float process(float input)
-		{
-			// Filter individual samples here - 𝑦0 = 𝑎𝑥0 + 𝑏𝑦-1
-			// Y is the output, X is the input, a is the fCurrentACoeff, b is the fPreviousBCoeff, and y-1 is the previous output sample
-			float fOutput = (input * fCurrentACoeff) + (fPreviousOutput * fPreviousBCoeff);
-			fPreviousOutput = fOutput;  // Store for next sample
-			fOutput = input - fOutput; // High-pass filter output is the input minus the low-pass filter output
-
-			return fOutput;
-		}
-
-	private:
-		// Declare your internal firstOrderFilter variables here
-
-		float fCurrentACoeff;
-		float fPreviousBCoeff = 0.0f;
-		float fPreviousOutput = 0.0f;  // Stores y-1
-	};
-
-	class MyBiQuadFilter
-	{
-	public:
-
-		void set(float fCutoff)
-		{
-			firstOrderFilter.set(fCutoff);
-			secondOrderFilter.set(fCutoff);
-		}
-
-		void process(float& fWet)
-		{
-			fWet = firstOrderFilter.process(fWet); // shallow -6dB firstOrderFilter slope. Lets through significant frequency content above the cutoff.
-			fWet = secondOrderFilter.process(fWet); // second order firstOrderFilter -12dB firstOrderFilter slope. Lets through less frequency content above the cutoff.
-		}
-
-	private:
-		MyIirFilter firstOrderFilter;
-		MyIirFilter secondOrderFilter;
-	};
-
-	class FilterStages
-	{
-	public:
-
-		void set(float fCutoff)
-		{
-			for (int i = 0; i < 4; ++i) biQuadFilter[i].set(fCutoff);
-		}
-
-		void process(float& fWet)
-		{
-			for (int i = 0; i < 4; ++i) biQuadFilter[i].process(fWet); // shallow -6dB firstOrderFilter slope. Lets through significant frequency content above the cutoff.
-		}
-
-	private:
-		MyBiQuadFilter biQuadFilter[4];
-	};
-};
-
-class MyBandPassFilter
-{
-public:
-
-	class MyBiQuadFilter
-	{
-	public:
-
-		void set(float fFrequency, float fQ)
-		{
-			// Calculate band edges from centre frequency and Q value
-			if (fQ < 0.001f) fQ = 0.001f;
-			float fBandwidth = fFrequency / fQ;
-			float fLowCutoff = fFrequency - (fBandwidth * 0.5f);
-			float fHighCutoff = fFrequency + (fBandwidth * 0.5f);
-
-			if (fLowCutoff < 0.0f) fLowCutoff = 0.0f;
-			if (fHighCutoff > 1.0f) fHighCutoff = 1.0f;
-			if (fHighCutoff < fLowCutoff) fHighCutoff = fLowCutoff;
-
-			for (int i = 0; i < 4; ++i)
+		public:
+			void set(float fCutoff, float sampleRate)
 			{
-				HPF[i].set(fLowCutoff);
-				LPF[i].set(fHighCutoff);
+				// Map normalised cutoff parameter to a musical frequency range.
+				float fFrequency = mapFrequency(fCutoff, sampleRate);
+				float fQ = 0.7071f;
+				float fOmega = (2.0f * 3.14159265359f * fFrequency) / sampleRate;
+				float fSinOmega = sinf(fOmega);
+				float fCosOmega = cosf(fOmega);
+				float fAlpha = fSinOmega / (2.0f * fQ);
+
+				float b0 = (1.0f - fCosOmega) * 0.5f;
+				float b1 = 1.0f - fCosOmega;
+				float b2 = (1.0f - fCosOmega) * 0.5f;
+				float a0 = 1.0f + fAlpha;
+				float a1 = -2.0f * fCosOmega;
+				float a2 = 1.0f - fAlpha;
+
+				setTargets(b0, b1, b2, a0, a1, a2);
 			}
-		}
 
-		void process(float& fWet)
+			float process(float input)
+			{
+				// Smooth coefficients to avoid zipper noise when parameters move.
+				smoothCoeffs();
+
+				// Process filter sample here using the biquad difference equation.
+				float fOutput = (fCurrentB0 * input) + (fCurrentB1 * fPreviousInput1) + (fCurrentB2 * fPreviousInput2)
+					- (fCurrentA1 * fPreviousOutput1) - (fCurrentA2 * fPreviousOutput2);
+				fPreviousInput2 = fPreviousInput1;
+				fPreviousInput1 = input;
+				fPreviousOutput2 = fPreviousOutput1;
+				fPreviousOutput1 = fOutput;
+				return fOutput;
+			}
+
+		private:
+			// Declare your internal firstOrderFilter variables here
+
+			float mapFrequency(float fCutoff, float sampleRate)
+			{
+				if (fCutoff < 0.0f) fCutoff = 0.0f;
+				if (fCutoff > 1.0f) fCutoff = 1.0f;
+				float fMinHz = 20.0f;
+				float fMaxHz = sampleRate * 0.45f;
+				if (fMaxHz < fMinHz) fMaxHz = fMinHz;
+				return fMinHz * powf(fMaxHz / fMinHz, fCutoff);
+			}
+
+			void setTargets(float b0, float b1, float b2, float a0, float a1, float a2)
+			{
+				fTargetB0 = b0 / a0;
+				fTargetB1 = b1 / a0;
+				fTargetB2 = b2 / a0;
+				fTargetA1 = a1 / a0;
+				fTargetA2 = a2 / a0;
+
+				if (!bHasInitialised)
+				{
+					fCurrentB0 = fTargetB0;
+					fCurrentB1 = fTargetB1;
+					fCurrentB2 = fTargetB2;
+					fCurrentA1 = fTargetA1;
+					fCurrentA2 = fTargetA2;
+					bHasInitialised = true;
+				}
+			}
+
+			void smoothCoeffs()
+			{
+				fCurrentB0 += (fTargetB0 - fCurrentB0) * fCoeffSmoothing;
+				fCurrentB1 += (fTargetB1 - fCurrentB1) * fCoeffSmoothing;
+				fCurrentB2 += (fTargetB2 - fCurrentB2) * fCoeffSmoothing;
+				fCurrentA1 += (fTargetA1 - fCurrentA1) * fCoeffSmoothing;
+				fCurrentA2 += (fTargetA2 - fCurrentA2) * fCoeffSmoothing;
+			}
+
+			bool bHasInitialised = false;
+			float fCoeffSmoothing = 0.0025f;
+
+			float fCurrentB0 = 1.0f;
+			float fCurrentB1 = 0.0f;
+			float fCurrentB2 = 0.0f;
+			float fCurrentA1 = 0.0f;
+			float fCurrentA2 = 0.0f;
+
+			float fTargetB0 = 1.0f;
+			float fTargetB1 = 0.0f;
+			float fTargetB2 = 0.0f;
+			float fTargetA1 = 0.0f;
+			float fTargetA2 = 0.0f;
+
+			float fPreviousInput1 = 0.0f;
+			float fPreviousInput2 = 0.0f;
+			float fPreviousOutput1 = 0.0f;
+			float fPreviousOutput2 = 0.0f;
+		};
+
+		class MyBiQuadFilter
 		{
-			// High-pass first to remove low-frequency content below the band.
-			for (int i = 0; i < 4; ++i) HPF[i].process(fWet);
+		public:
 
-			// Low-pass second to remove high-frequency content above the band.
-			for (int i = 0; i < 4; ++i) LPF[i].process(fWet);
-		}
+			void set(float fCutoff, float sampleRate)
+			{
+				firstOrderFilter.set(fCutoff, sampleRate);
+				secondOrderFilter.set(fCutoff, sampleRate);
+			}
 
-	private:
-		MyHighPassFilter::MyBiQuadFilter HPF[4];
-		MyLowPassFilter::MyBiQuadFilter LPF[4];
+			void process(float& fWet)
+			{
+				fWet = firstOrderFilter.process(fWet); // First low-pass biquad stage.
+				fWet = secondOrderFilter.process(fWet); // Second low-pass biquad stage.
+			}
+
+		private:
+			MyIirFilter firstOrderFilter;
+			MyIirFilter secondOrderFilter;
+		};
+
+		class FilterStages
+		{
+		public:
+
+			void set(float fCutoff, float sampleRate)
+			{
+				for (int i = 0; i < 2; ++i) biQuadFilter[i].set(fCutoff, sampleRate);
+			}
+
+			void process(float& fWet)
+			{
+				for (int i = 0; i < 2; ++i) biQuadFilter[i].process(fWet); // 2-stage low-pass cascade.
+			}
+
+		private:
+			MyBiQuadFilter biQuadFilter[2];
+		};
 	};
 
-	class FilterStages
+	class MyHighPassFilter
 	{
 	public:
 
-		void set(float fFrequency, float fQ)
+		class MyIirFilter
 		{
-			for (int i = 0; i < 4; ++i) biQuadFilter[i].set(fFrequency, fQ);
-		}
+		public:
+			void set(float fCutoff, float sampleRate)
+			{
+				// Map normalised cutoff parameter to a musical frequency range.
+				float fFrequency = mapFrequency(fCutoff, sampleRate);
+				float fQ = 0.7071f;
+				float fOmega = (2.0f * 3.14159265359f * fFrequency) / sampleRate;
+				float fSinOmega = sinf(fOmega);
+				float fCosOmega = cosf(fOmega);
+				float fAlpha = fSinOmega / (2.0f * fQ);
 
-		void process(float& fWet)
+				float b0 = (1.0f + fCosOmega) * 0.5f;
+				float b1 = -(1.0f + fCosOmega);
+				float b2 = (1.0f + fCosOmega) * 0.5f;
+				float a0 = 1.0f + fAlpha;
+				float a1 = -2.0f * fCosOmega;
+				float a2 = 1.0f - fAlpha;
+
+				setTargets(b0, b1, b2, a0, a1, a2);
+			}
+
+			float process(float input)
+			{
+				// Smooth coefficients to avoid zipper noise when parameters move.
+				smoothCoeffs();
+
+				// Process filter sample here using the biquad difference equation.
+				float fOutput = (fCurrentB0 * input) + (fCurrentB1 * fPreviousInput1) + (fCurrentB2 * fPreviousInput2)
+					- (fCurrentA1 * fPreviousOutput1) - (fCurrentA2 * fPreviousOutput2);
+				fPreviousInput2 = fPreviousInput1;
+				fPreviousInput1 = input;
+				fPreviousOutput2 = fPreviousOutput1;
+				fPreviousOutput1 = fOutput;
+				return fOutput;
+			}
+
+		private:
+			// Declare your internal firstOrderFilter variables here
+
+			float mapFrequency(float fCutoff, float sampleRate)
+			{
+				if (fCutoff < 0.0f) fCutoff = 0.0f;
+				if (fCutoff > 1.0f) fCutoff = 1.0f;
+				float fMinHz = 20.0f;
+				float fMaxHz = sampleRate * 0.45f;
+				if (fMaxHz < fMinHz) fMaxHz = fMinHz;
+				return fMinHz * powf(fMaxHz / fMinHz, fCutoff);
+			}
+
+			void setTargets(float b0, float b1, float b2, float a0, float a1, float a2)
+			{
+				fTargetB0 = b0 / a0;
+				fTargetB1 = b1 / a0;
+				fTargetB2 = b2 / a0;
+				fTargetA1 = a1 / a0;
+				fTargetA2 = a2 / a0;
+
+				if (!bHasInitialised)
+				{
+					fCurrentB0 = fTargetB0;
+					fCurrentB1 = fTargetB1;
+					fCurrentB2 = fTargetB2;
+					fCurrentA1 = fTargetA1;
+					fCurrentA2 = fTargetA2;
+					bHasInitialised = true;
+				}
+			}
+
+			void smoothCoeffs()
+			{
+				fCurrentB0 += (fTargetB0 - fCurrentB0) * fCoeffSmoothing;
+				fCurrentB1 += (fTargetB1 - fCurrentB1) * fCoeffSmoothing;
+				fCurrentB2 += (fTargetB2 - fCurrentB2) * fCoeffSmoothing;
+				fCurrentA1 += (fTargetA1 - fCurrentA1) * fCoeffSmoothing;
+				fCurrentA2 += (fTargetA2 - fCurrentA2) * fCoeffSmoothing;
+			}
+
+			bool bHasInitialised = false;
+			float fCoeffSmoothing = 0.0025f;
+
+			float fCurrentB0 = 1.0f;
+			float fCurrentB1 = 0.0f;
+			float fCurrentB2 = 0.0f;
+			float fCurrentA1 = 0.0f;
+			float fCurrentA2 = 0.0f;
+
+			float fTargetB0 = 1.0f;
+			float fTargetB1 = 0.0f;
+			float fTargetB2 = 0.0f;
+			float fTargetA1 = 0.0f;
+			float fTargetA2 = 0.0f;
+
+			float fPreviousInput1 = 0.0f;
+			float fPreviousInput2 = 0.0f;
+			float fPreviousOutput1 = 0.0f;
+			float fPreviousOutput2 = 0.0f;
+		};
+
+		class MyBiQuadFilter
 		{
-			for (int i = 0; i < 4; ++i) biQuadFilter[i].process(fWet); // shallow -6dB firstOrderFilter slope. Lets through significant frequency content above the cutoff.
-		}
+		public:
+
+			void set(float fCutoff, float sampleRate)
+			{
+				firstOrderFilter.set(fCutoff, sampleRate);
+				secondOrderFilter.set(fCutoff, sampleRate);
+			}
+
+			void process(float& fWet)
+			{
+				fWet = firstOrderFilter.process(fWet); // First high-pass biquad stage.
+				fWet = secondOrderFilter.process(fWet); // Second high-pass biquad stage.
+			}
+
+		private:
+			MyIirFilter firstOrderFilter;
+			MyIirFilter secondOrderFilter;
+		};
+
+		class FilterStages
+		{
+		public:
+
+			void set(float fCutoff, float sampleRate)
+			{
+				for (int i = 0; i < 2; ++i) biQuadFilter[i].set(fCutoff, sampleRate);
+			}
+
+			void process(float& fWet)
+			{
+				for (int i = 0; i < 2; ++i) biQuadFilter[i].process(fWet); // 2-stage high-pass cascade.
+			}
+
+		private:
+			MyBiQuadFilter biQuadFilter[2];
+		};
+	};
+
+	class MyBandPassFilter
+	{
+	public:
+
+		class MyIirFilter
+		{
+		public:
+			void set(float fFrequency, float fQ, float sampleRate)
+			{
+				// Map normalised frequency and Q parameters to musical ranges.
+				float fFrequencyHz = mapFrequency(fFrequency, sampleRate);
+				float fQValue = mapQ(fQ);
+				float fOmega = (2.0f * 3.14159265359f * fFrequencyHz) / sampleRate;
+				float fSinOmega = sinf(fOmega);
+				float fCosOmega = cosf(fOmega);
+				float fAlpha = fSinOmega / (2.0f * fQValue);
+
+				float b0 = fAlpha;
+				float b1 = 0.0f;
+				float b2 = -fAlpha;
+				float a0 = 1.0f + fAlpha;
+				float a1 = -2.0f * fCosOmega;
+				float a2 = 1.0f - fAlpha;
+
+				setTargets(b0, b1, b2, a0, a1, a2);
+			}
+
+			float process(float input)
+			{
+				// Smooth coefficients to avoid zipper noise when parameters move.
+				smoothCoeffs();
+
+				// Process filter sample here using the biquad difference equation.
+				float fOutput = (fCurrentB0 * input) + (fCurrentB1 * fPreviousInput1) + (fCurrentB2 * fPreviousInput2)
+					- (fCurrentA1 * fPreviousOutput1) - (fCurrentA2 * fPreviousOutput2);
+				fPreviousInput2 = fPreviousInput1;
+				fPreviousInput1 = input;
+				fPreviousOutput2 = fPreviousOutput1;
+				fPreviousOutput1 = fOutput;
+				return fOutput;
+			}
+
+		private:
+			// Declare your internal firstOrderFilter variables here
+
+			float mapFrequency(float fFrequency, float sampleRate)
+			{
+				if (fFrequency < 0.0f) fFrequency = 0.0f;
+				if (fFrequency > 1.0f) fFrequency = 1.0f;
+				float fMinHz = 20.0f;
+				float fMaxHz = sampleRate * 0.45f;
+				if (fMaxHz < fMinHz) fMaxHz = fMinHz;
+				return fMinHz * powf(fMaxHz / fMinHz, fFrequency);
+			}
+
+			float mapQ(float fQ)
+			{
+				if (fQ < 0.0f) fQ = 0.0f;
+				if (fQ > 1.0f) fQ = 1.0f;
+				return 0.3f + (fQ * (12.0f - 0.3f));
+			}
+
+			void setTargets(float b0, float b1, float b2, float a0, float a1, float a2)
+			{
+				fTargetB0 = b0 / a0;
+				fTargetB1 = b1 / a0;
+				fTargetB2 = b2 / a0;
+				fTargetA1 = a1 / a0;
+				fTargetA2 = a2 / a0;
+
+				if (!bHasInitialised)
+				{
+					fCurrentB0 = fTargetB0;
+					fCurrentB1 = fTargetB1;
+					fCurrentB2 = fTargetB2;
+					fCurrentA1 = fTargetA1;
+					fCurrentA2 = fTargetA2;
+					bHasInitialised = true;
+				}
+			}
+
+			void smoothCoeffs()
+			{
+				fCurrentB0 += (fTargetB0 - fCurrentB0) * fCoeffSmoothing;
+				fCurrentB1 += (fTargetB1 - fCurrentB1) * fCoeffSmoothing;
+				fCurrentB2 += (fTargetB2 - fCurrentB2) * fCoeffSmoothing;
+				fCurrentA1 += (fTargetA1 - fCurrentA1) * fCoeffSmoothing;
+				fCurrentA2 += (fTargetA2 - fCurrentA2) * fCoeffSmoothing;
+			}
+
+			bool bHasInitialised = false;
+			float fCoeffSmoothing = 0.0025f;
+
+			float fCurrentB0 = 1.0f;
+			float fCurrentB1 = 0.0f;
+			float fCurrentB2 = 0.0f;
+			float fCurrentA1 = 0.0f;
+			float fCurrentA2 = 0.0f;
+
+			float fTargetB0 = 1.0f;
+			float fTargetB1 = 0.0f;
+			float fTargetB2 = 0.0f;
+			float fTargetA1 = 0.0f;
+			float fTargetA2 = 0.0f;
+
+			float fPreviousInput1 = 0.0f;
+			float fPreviousInput2 = 0.0f;
+			float fPreviousOutput1 = 0.0f;
+			float fPreviousOutput2 = 0.0f;
+		};
+
+		class MyBiQuadFilter
+		{
+		public:
+
+			void set(float fFrequency, float fQ, float sampleRate)
+			{
+				firstOrderFilter.set(fFrequency, fQ, sampleRate);
+				secondOrderFilter.set(fFrequency, fQ, sampleRate);
+			}
+
+			void process(float& fWet)
+			{
+				fWet = firstOrderFilter.process(fWet); // First band-pass biquad stage.
+				fWet = secondOrderFilter.process(fWet); // Second band-pass biquad stage.
+			}
+
+		private:
+			MyIirFilter firstOrderFilter;
+			MyIirFilter secondOrderFilter;
+		};
+
+		class FilterStages
+		{
+		public:
+
+			void set(float fFrequency, float fQ, float sampleRate)
+			{
+				for (int i = 0; i < 2; ++i) biQuadFilter[i].set(fFrequency, fQ, sampleRate);
+			}
+
+			void process(float& fWet)
+			{
+				for (int i = 0; i < 2; ++i) biQuadFilter[i].process(fWet); // 2-stage band-pass cascade.
+			}
+
+		private:
+			MyBiQuadFilter biQuadFilter[2];
+		};
+	};
 
 	private:
-		MyBiQuadFilter biQuadFilter[4];
-	};
+
+	MyLowPassFilter::FilterStages LPF[2]; // Stereo lowpass filter stages (2 channels)
+	MyBandPassFilter::FilterStages BPF[2]; // Stereo bandpass filter stages (2 channels)
+	MyHighPassFilter::FilterStages HPF[2]; // Stereo highpass filter stages (2 channels)
 };

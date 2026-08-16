@@ -92,33 +92,30 @@ void MyEffect::buttonPressed(int iButton)
 // (inputBuffer contains the input audio, and processed samples should be stored in outputBuffer)
 void MyEffect::process(const float** inputBuffers, float** outputBuffers, int numSamples)
 {
-    float fIn[2], fOut[2] = {0.0f, 0.0f};
-    const float *pfInBuffer[2] = { inputBuffers[0], inputBuffers[1] };
-    float *pfOutBuffer[2] = { outputBuffers[0], outputBuffers[1] };
-    
-    float fInGain = parameters[0];
+	float fIn[2], fOut[2] = {0.0f, 0.0f};
+	const float *pfInBuffer[2] = { inputBuffers[0], inputBuffers[1] };
+	float *pfOutBuffer[2] = { outputBuffers[0], outputBuffers[1] };
+
+	float fInGain = parameters[0];
 
 	float fLpfGain = parameters[1];
-    float fLpfCutoff = parameters[2];
+	float fLpfCutoff = parameters[2];
 	float fLpfOnOff = parameters[3];
 
 	float fBpfGain = parameters[4];
 	float fBpfQ = parameters[5];
 	float fBpfFrequency = parameters[6];
 	float fBpfOnOff = parameters[7];
-    
+
 	float fHpfGain = parameters[8];
-    float fHpfCutoff = parameters[9];
+	float fHpfCutoff = parameters[9];
 	float fHpfOnOff = parameters[10];
 
 	float fOutGain = parameters[11];
+	float fSampleRate = getSampleRate();
 
-	for (int ch = 0; ch < 2; ch++)
-	{
-		LPF[ch].set(fLpfCutoff);
-		BPF[ch].set(fBpfFrequency, fBpfQ);
-		HPF[ch].set(fHpfCutoff);
-	}
+    for (int ch = 0; ch < 2; ch++)
+        filters[ch].setupFilters(fLpfCutoff, fSampleRate, fBpfFrequency, fBpfQ, fHpfCutoff);
 
 	for (int i = 0; i < numSamples; i++)
 	{
@@ -128,25 +125,11 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 			fIn[ch] = *pfInBuffer[ch]++;
 
 			// Add your effect processing here
-			float fWet = fIn[ch] * fInGain * 0.5f;
+			float fInput = fIn[ch] * fInGain;
+			float fWet;
+			filters[ch].processFilters(fLpfOnOff, fInput, ch, fLpfGain, fBpfOnOff, fBpfGain, fHpfOnOff, fHpfGain, fWet);
 
-			if (fLpfOnOff > 0.5f)
-			{
-				LPF[ch].process(fWet);
-				fWet *= fLpfGain;
-			}
-			if (fBpfOnOff > 0.5f)
-			{
-				BPF[ch].process(fWet);
-				fWet *= fBpfGain;
-			}
-			if (fHpfOnOff > 0.5f)
-			{
-				HPF[ch].process(fWet);
-				fWet *= fHpfGain;
-			}
-
-			fOut[ch] = fWet * fOutGain;
+			fOut[ch] = tanhf(fWet * fOutGain); // Soft clip to keep output level controlled.
 
 			// Copy result to output
 			*pfOutBuffer[ch]++ = fOut[ch];
