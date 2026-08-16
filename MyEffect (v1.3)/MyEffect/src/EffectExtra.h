@@ -11,7 +11,7 @@ class MyIirFilter
 public:
 	void set(float coeff)
 	{
-		// Initialise your filter variables here
+		// Initialise your firstOrderFilter variables here
 		fCurrentACoeff = coeff;
 		fPreviousBCoeff = 1.0f - fCurrentACoeff;
 	}
@@ -33,9 +33,30 @@ public:
 	}
 
 private:
-	// Declare your internal filter variables here
+	// Declare your internal firstOrderFilter variables here
 
 	float fCurrentACoeff;
 	float fPreviousBCoeff = 0.0f;
 	float fPreviousOutput = 0.0f;  // Stores y-1
+};
+
+class MyBiQuadFilter
+{
+public:
+
+	void set(float fCutoff)
+	{
+		firstOrderFilter.set(fCutoff);
+		secondOrderFilter.set(fCutoff);
+	}
+
+	void process(float& fWet)
+	{
+		fWet = firstOrderFilter.process(fWet); // shallow -6dB firstOrderFilter slope. Lets through significant frequency content above the cutoff.
+		fWet = secondOrderFilter.process(fWet); // second order firstOrderFilter -12dB firstOrderFilter slope. Lets through less frequency content above the cutoff.
+	}
+
+private:
+	MyIirFilter firstOrderFilter;
+	MyIirFilter secondOrderFilter;
 };

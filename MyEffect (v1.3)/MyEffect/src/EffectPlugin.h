@@ -21,7 +21,7 @@ public:
 
     void setSampleRate(float sampleRate){ stk::Stk::setSampleRate(sampleRate); }
     float getSampleRate() const { return stk::Stk::sampleRate(); };
-    
+
     void process(const float** inputBuffers, float** outputBuffers, int numSamples);
     
     void presetLoaded(int iPresetNum, const char *sPresetName);
@@ -31,6 +31,5 @@ public:
 private:
     // Declare shared member variables here
 
-    MyIirFilter filter[2];
-    MyIirFilter secondOrderFilter[2];
+	MyBiQuadFilter filter[2][4]; // Stereo 4-stage biquad filter (2 channels, 4 stages)
 };
