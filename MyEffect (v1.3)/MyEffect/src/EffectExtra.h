@@ -12,30 +12,30 @@ public:
 	void set(float coeff)
 	{
 		// Initialise your filter variables here
-		currentACoeff = coeff;
-		previousBCoeff = 1 - currentACoeff;
+		fCurrentACoeff = coeff;
+		fPreviousBCoeff = 1.0f - fCurrentACoeff;
 	}
 
 	float getCutoff(float sampleRate)
 	{
-		float fOutput = acos(1 - (pow(currentACoeff, 2 / (2 * previousBCoeff))) * (sampleRate / (2 * M_PI))); // Calculate cutoff frequency based on currentACoeff and previousBCoeff
+		float fOutput = acos(1 - (pow(fCurrentACoeff, 2.0f / (2.0f * fPreviousBCoeff))) * (sampleRate / (2.0f * M_PI))); // Calculate cutoff frequency based on fCurrentACoeff and fPreviousBCoeff
 		printf("Cutoff: %f\n", fOutput);
 		return fOutput;
 	}
 
 	float process(float input)
 	{
-		// Filter individual samples here - 𝑦0 = 𝑎𝑥0 + ((1 − 𝑎) * 𝑥0-1)
-		// Y is the output, X is the input, a is the currentACoeff, and x0-1 is the previous input sample
-		float fOutput = (input * currentACoeff) + ((1 - currentACoeff) * previousInput);
-		previousInput = input;  // Store for next sample
+		// Filter individual samples here - 𝑦0 = 𝑎𝑥0 + 𝑏𝑦-1
+		// Y is the output, X is the input, a is the fCurrentACoeff, b is the fPreviousBCoeff, and y-1 is the previous output sample
+		float fOutput = (input * fCurrentACoeff) + (fPreviousOutput * fPreviousBCoeff);
+		fPreviousOutput = fOutput;  // Store for next sample
 		return fOutput;
 	}
 
 private:
 	// Declare your internal filter variables here
 
-	float currentACoeff;
-	float previousBCoeff = 0;
-	float previousInput = 0;   // Stores x-1
+	float fCurrentACoeff;
+	float fPreviousBCoeff = 0.0f;
+	float fPreviousOutput = 0.0f;  // Stores y-1
 };
