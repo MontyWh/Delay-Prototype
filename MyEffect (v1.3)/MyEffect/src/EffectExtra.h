@@ -25,9 +25,10 @@ public:
 
 	float process(float input)
 	{
-		// Filter individual samples here - 𝑦0 = 𝑎𝑥0 + 𝑏𝑦-1
-		float fOutput = (input * currentACoeff) + (previousOutput * previousBCoeff);
-		previousOutput = fOutput;  // Store for next sample
+		// Filter individual samples here - 𝑦0 = 𝑎𝑥0 + ((1 − 𝑎) * 𝑥0-1)
+		// Y is the output, X is the input, a is the currentACoeff, and x0-1 is the previous input sample
+		float fOutput = (input * currentACoeff) + ((1 - currentACoeff) * previousInput);
+		previousInput = input;  // Store for next sample
 		return fOutput;
 	}
 
@@ -36,5 +37,5 @@ private:
 
 	float currentACoeff;
 	float previousBCoeff = 0;
-	float previousOutput = 0;  // Stores y-1
+	float previousInput = 0;   // Stores x-1
 };
