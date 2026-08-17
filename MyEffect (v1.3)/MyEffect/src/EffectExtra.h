@@ -61,34 +61,38 @@ public:
 		class MyIirFilter
 		{
 		public:
-			void set(float fCutoff, float sampleRate)
+			void set(float cutoff, float sampleRate)
 			{
-				// Map normalised cutoff parameter to a musical frequency range.
-				float fFrequency = mapFrequency(fCutoff, sampleRate);
+				// Map normalised cutoff parameter to a musical f range.
+				float fMinHz = 20.0f;
+				float fMaxHz = sampleRate * 0.45f;
+				if (fMaxHz < fMinHz) fMaxHz = fMinHz;
+				float fFrequency = fMinHz * powf(fMaxHz / fMinHz, cutoff);
+
 				float fQ = 0.7071f;
-				float fOmega = (2.0f * 3.14159265359f * fFrequency) / sampleRate;
+				float fOmega = (2.0f * M_PI * fFrequency) / sampleRate;
 				float fSinOmega = sinf(fOmega);
 				float fCosOmega = cosf(fOmega);
 				float fAlpha = fSinOmega / (2.0f * fQ);
 
-				float b0 = (1.0f - fCosOmega) * 0.5f;
-				float b1 = 1.0f - fCosOmega;
-				float b2 = (1.0f - fCosOmega) * 0.5f;
-				float a0 = 1.0f + fAlpha;
-				float a1 = -2.0f * fCosOmega;
-				float a2 = 1.0f - fAlpha;
+				float fB0 = (1.0f - fCosOmega) * 0.5f;
+				float fB1 = 1.0f - fCosOmega;
+				float fB2 = (1.0f - fCosOmega) * 0.5f;
+				float fA0 = 1.0f + fAlpha;
+				float fA1 = -2.0f * fCosOmega;
+				float fA2 = 1.0f - fAlpha;
 
-				setTargets(b0, b1, b2, a0, a1, a2);
+				setCoeffTargets(fB0, fB1, fB2, fA0, fA1, fA2);
 			}
 
 			float process(float input)
 			{
 				// Smooth coefficients to avoid zipper noise when parameters move.
-				smoothCoeffs();
+				smoothCoefficientTargets();
 
 				// Process filter sample here using the biquad difference equation.
-				float fOutput = (fCurrentB0 * input) + (fCurrentB1 * fPreviousInput1) + (fCurrentB2 * fPreviousInput2)
-					- (fCurrentA1 * fPreviousOutput1) - (fCurrentA2 * fPreviousOutput2);
+				float fOutput = (fCurrentB0Coeff * input) + (fCurrentB1Coeff * fPreviousInput1) + (fCurrentB2Coeff * fPreviousInput2)
+					- (fCurrentA1Coeff * fPreviousOutput1) - (fCurrentA2Coeff * fPreviousOutput2);
 				fPreviousInput2 = fPreviousInput1;
 				fPreviousInput1 = input;
 				fPreviousOutput2 = fPreviousOutput1;
@@ -99,58 +103,48 @@ public:
 		private:
 			// Declare your internal firstOrderFilter variables here
 
-			float mapFrequency(float fCutoff, float sampleRate)
+			void setCoeffTargets(float b0, float b1, float b2, float a0, float a1, float a2)
 			{
-				if (fCutoff < 0.0f) fCutoff = 0.0f;
-				if (fCutoff > 1.0f) fCutoff = 1.0f;
-				float fMinHz = 20.0f;
-				float fMaxHz = sampleRate * 0.45f;
-				if (fMaxHz < fMinHz) fMaxHz = fMinHz;
-				return fMinHz * powf(fMaxHz / fMinHz, fCutoff);
-			}
+				fTargetB0Coeff = b0 / a0;
+				fTargetB1Coeff = b1 / a0;
+				fTargetB2Coeff = b2 / a0;
+				fTargetA1Coeff = a1 / a0;
+				fTargetA2Coeff = a2 / a0;
 
-			void setTargets(float b0, float b1, float b2, float a0, float a1, float a2)
-			{
-				fTargetB0 = b0 / a0;
-				fTargetB1 = b1 / a0;
-				fTargetB2 = b2 / a0;
-				fTargetA1 = a1 / a0;
-				fTargetA2 = a2 / a0;
-
-				if (!bHasInitialised)
+				if (!bHasInitialisedCoeffs)
 				{
-					fCurrentB0 = fTargetB0;
-					fCurrentB1 = fTargetB1;
-					fCurrentB2 = fTargetB2;
-					fCurrentA1 = fTargetA1;
-					fCurrentA2 = fTargetA2;
-					bHasInitialised = true;
+					fCurrentB0Coeff = fTargetB0Coeff;
+					fCurrentB1Coeff = fTargetB1Coeff;
+					fCurrentB2Coeff = fTargetB2Coeff;
+					fCurrentA1Coeff = fTargetA1Coeff;
+					fCurrentA2Coeff = fTargetA2Coeff;
+					bHasInitialisedCoeffs = true;
 				}
 			}
 
-			void smoothCoeffs()
+			void smoothCoefficientTargets()
 			{
-				fCurrentB0 += (fTargetB0 - fCurrentB0) * fCoeffSmoothing;
-				fCurrentB1 += (fTargetB1 - fCurrentB1) * fCoeffSmoothing;
-				fCurrentB2 += (fTargetB2 - fCurrentB2) * fCoeffSmoothing;
-				fCurrentA1 += (fTargetA1 - fCurrentA1) * fCoeffSmoothing;
-				fCurrentA2 += (fTargetA2 - fCurrentA2) * fCoeffSmoothing;
+				fCurrentB0Coeff += (fTargetB0Coeff - fCurrentB0Coeff) * fCoeffSmoothing;
+				fCurrentB1Coeff += (fTargetB1Coeff - fCurrentB1Coeff) * fCoeffSmoothing;
+				fCurrentB2Coeff += (fTargetB2Coeff - fCurrentB2Coeff) * fCoeffSmoothing;
+				fCurrentA1Coeff += (fTargetA1Coeff - fCurrentA1Coeff) * fCoeffSmoothing;
+				fCurrentA2Coeff += (fTargetA2Coeff - fCurrentA2Coeff) * fCoeffSmoothing;
 			}
 
-			bool bHasInitialised = false;
+			bool bHasInitialisedCoeffs = false;
 			float fCoeffSmoothing = 0.0025f;
 
-			float fCurrentB0 = 1.0f;
-			float fCurrentB1 = 0.0f;
-			float fCurrentB2 = 0.0f;
-			float fCurrentA1 = 0.0f;
-			float fCurrentA2 = 0.0f;
+			float fCurrentB0Coeff = 1.0f;
+			float fCurrentB1Coeff = 0.0f;
+			float fCurrentB2Coeff = 0.0f;
+			float fCurrentA1Coeff = 0.0f;
+			float fCurrentA2Coeff = 0.0f;
 
-			float fTargetB0 = 1.0f;
-			float fTargetB1 = 0.0f;
-			float fTargetB2 = 0.0f;
-			float fTargetA1 = 0.0f;
-			float fTargetA2 = 0.0f;
+			float fTargetB0Coeff = 1.0f;
+			float fTargetB1Coeff = 0.0f;
+			float fTargetB2Coeff = 0.0f;
+			float fTargetA1Coeff = 0.0f;
+			float fTargetA2Coeff = 0.0f;
 
 			float fPreviousInput1 = 0.0f;
 			float fPreviousInput2 = 0.0f;
@@ -162,16 +156,16 @@ public:
 		{
 		public:
 
-			void set(float fCutoff, float sampleRate)
+			void set(float cutoff, float sampleRate)
 			{
-				firstOrderFilter.set(fCutoff, sampleRate);
-				secondOrderFilter.set(fCutoff, sampleRate);
+				firstOrderFilter.set(cutoff, sampleRate);
+				secondOrderFilter.set(cutoff, sampleRate);
 			}
 
-			void process(float& fWet)
+			void process(float& wet)
 			{
-				fWet = firstOrderFilter.process(fWet); // First low-pass biquad stage.
-				fWet = secondOrderFilter.process(fWet); // Second low-pass biquad stage.
+				wet = firstOrderFilter.process(wet); // First low-pass biquad stage.
+				wet = secondOrderFilter.process(wet); // Second low-pass biquad stage.
 			}
 
 		private:
@@ -183,14 +177,14 @@ public:
 		{
 		public:
 
-			void set(float fCutoff, float sampleRate)
+			void set(float cutoff, float sampleRate)
 			{
-				for (int i = 0; i < 2; ++i) biQuadFilter[i].set(fCutoff, sampleRate);
+				for (int i = 0; i < 2; ++i) biQuadFilter[i].set(cutoff, sampleRate);
 			}
 
-			void process(float& fWet)
+			void process(float& wet)
 			{
-				for (int i = 0; i < 2; ++i) biQuadFilter[i].process(fWet); // 2-stage low-pass cascade.
+				for (int i = 0; i < 2; ++i) biQuadFilter[i].process(wet); // 2-stage low-pass cascade.
 			}
 
 		private:
@@ -205,34 +199,34 @@ public:
 		class MyIirFilter
 		{
 		public:
-			void set(float fCutoff, float sampleRate)
+			void set(float cutoff, float sampleRate)
 			{
-				// Map normalised cutoff parameter to a musical frequency range.
-				float fFrequency = mapFrequency(fCutoff, sampleRate);
+				// Map normalised cutoff parameter to a musical f range.
+				float fFrequency = mapFrequencyFromNormalised(cutoff, sampleRate);
 				float fQ = 0.7071f;
 				float fOmega = (2.0f * 3.14159265359f * fFrequency) / sampleRate;
 				float fSinOmega = sinf(fOmega);
 				float fCosOmega = cosf(fOmega);
 				float fAlpha = fSinOmega / (2.0f * fQ);
 
-				float b0 = (1.0f + fCosOmega) * 0.5f;
-				float b1 = -(1.0f + fCosOmega);
-				float b2 = (1.0f + fCosOmega) * 0.5f;
-				float a0 = 1.0f + fAlpha;
-				float a1 = -2.0f * fCosOmega;
-				float a2 = 1.0f - fAlpha;
+				float fB0 = (1.0f + fCosOmega) * 0.5f;
+				float fB1 = -(1.0f + fCosOmega);
+				float fB2 = (1.0f + fCosOmega) * 0.5f;
+				float fA0 = 1.0f + fAlpha;
+				float fA1 = -2.0f * fCosOmega;
+				float fA2 = 1.0f - fAlpha;
 
-				setTargets(b0, b1, b2, a0, a1, a2);
+				setCoeffTargets(fB0, fB1, fB2, fA0, fA1, fA2);
 			}
 
 			float process(float input)
 			{
 				// Smooth coefficients to avoid zipper noise when parameters move.
-				smoothCoeffs();
+				smoothCoefficientTargets();
 
 				// Process filter sample here using the biquad difference equation.
-				float fOutput = (fCurrentB0 * input) + (fCurrentB1 * fPreviousInput1) + (fCurrentB2 * fPreviousInput2)
-					- (fCurrentA1 * fPreviousOutput1) - (fCurrentA2 * fPreviousOutput2);
+				float fOutput = (fCurrentB0Coeff * input) + (fCurrentB1Coeff * fPreviousInput1) + (fCurrentB2Coeff * fPreviousInput2)
+					- (fCurrentA1Coeff * fPreviousOutput1) - (fCurrentA2Coeff * fPreviousOutput2);
 				fPreviousInput2 = fPreviousInput1;
 				fPreviousInput1 = input;
 				fPreviousOutput2 = fPreviousOutput1;
@@ -243,58 +237,58 @@ public:
 		private:
 			// Declare your internal firstOrderFilter variables here
 
-			float mapFrequency(float fCutoff, float sampleRate)
+			float mapFrequencyFromNormalised(float fCutoff, float fSampleRate)
 			{
 				if (fCutoff < 0.0f) fCutoff = 0.0f;
 				if (fCutoff > 1.0f) fCutoff = 1.0f;
 				float fMinHz = 20.0f;
-				float fMaxHz = sampleRate * 0.45f;
+				float fMaxHz = fSampleRate * 0.45f;
 				if (fMaxHz < fMinHz) fMaxHz = fMinHz;
 				return fMinHz * powf(fMaxHz / fMinHz, fCutoff);
 			}
 
-			void setTargets(float b0, float b1, float b2, float a0, float a1, float a2)
+			void setCoeffTargets(float b0, float b1, float b2, float a0, float a1, float a2)
 			{
-				fTargetB0 = b0 / a0;
-				fTargetB1 = b1 / a0;
-				fTargetB2 = b2 / a0;
-				fTargetA1 = a1 / a0;
-				fTargetA2 = a2 / a0;
+				fTargetB0Coeff = b0 / a0;
+				fTargetB1Coeff = b1 / a0;
+				fTargetB2Coeff = b2 / a0;
+				fTargetA1Coeff = a1 / a0;
+				fTargetA2Coeff = a2 / a0;
 
-				if (!bHasInitialised)
+				if (!bHasInitialisedCoeffs)
 				{
-					fCurrentB0 = fTargetB0;
-					fCurrentB1 = fTargetB1;
-					fCurrentB2 = fTargetB2;
-					fCurrentA1 = fTargetA1;
-					fCurrentA2 = fTargetA2;
-					bHasInitialised = true;
+					fCurrentB0Coeff = fTargetB0Coeff;
+					fCurrentB1Coeff = fTargetB1Coeff;
+					fCurrentB2Coeff = fTargetB2Coeff;
+					fCurrentA1Coeff = fTargetA1Coeff;
+					fCurrentA2Coeff = fTargetA2Coeff;
+					bHasInitialisedCoeffs = true;
 				}
 			}
 
-			void smoothCoeffs()
+			void smoothCoefficientTargets()
 			{
-				fCurrentB0 += (fTargetB0 - fCurrentB0) * fCoeffSmoothing;
-				fCurrentB1 += (fTargetB1 - fCurrentB1) * fCoeffSmoothing;
-				fCurrentB2 += (fTargetB2 - fCurrentB2) * fCoeffSmoothing;
-				fCurrentA1 += (fTargetA1 - fCurrentA1) * fCoeffSmoothing;
-				fCurrentA2 += (fTargetA2 - fCurrentA2) * fCoeffSmoothing;
+				fCurrentB0Coeff += (fTargetB0Coeff - fCurrentB0Coeff) * fCoeffSmoothing;
+				fCurrentB1Coeff += (fTargetB1Coeff - fCurrentB1Coeff) * fCoeffSmoothing;
+				fCurrentB2Coeff += (fTargetB2Coeff - fCurrentB2Coeff) * fCoeffSmoothing;
+				fCurrentA1Coeff += (fTargetA1Coeff - fCurrentA1Coeff) * fCoeffSmoothing;
+				fCurrentA2Coeff += (fTargetA2Coeff - fCurrentA2Coeff) * fCoeffSmoothing;
 			}
 
-			bool bHasInitialised = false;
+			bool bHasInitialisedCoeffs = false;
 			float fCoeffSmoothing = 0.0025f;
 
-			float fCurrentB0 = 1.0f;
-			float fCurrentB1 = 0.0f;
-			float fCurrentB2 = 0.0f;
-			float fCurrentA1 = 0.0f;
-			float fCurrentA2 = 0.0f;
+			float fCurrentB0Coeff = 1.0f;
+			float fCurrentB1Coeff = 0.0f;
+			float fCurrentB2Coeff = 0.0f;
+			float fCurrentA1Coeff = 0.0f;
+			float fCurrentA2Coeff = 0.0f;
 
-			float fTargetB0 = 1.0f;
-			float fTargetB1 = 0.0f;
-			float fTargetB2 = 0.0f;
-			float fTargetA1 = 0.0f;
-			float fTargetA2 = 0.0f;
+			float fTargetB0Coeff = 1.0f;
+			float fTargetB1Coeff = 0.0f;
+			float fTargetB2Coeff = 0.0f;
+			float fTargetA1Coeff = 0.0f;
+			float fTargetA2Coeff = 0.0f;
 
 			float fPreviousInput1 = 0.0f;
 			float fPreviousInput2 = 0.0f;
@@ -306,16 +300,16 @@ public:
 		{
 		public:
 
-			void set(float fCutoff, float sampleRate)
+			void set(float cutoff, float sampleRate)
 			{
-				firstOrderFilter.set(fCutoff, sampleRate);
-				secondOrderFilter.set(fCutoff, sampleRate);
+				firstOrderFilter.set(cutoff, sampleRate);
+				secondOrderFilter.set(cutoff, sampleRate);
 			}
 
-			void process(float& fWet)
+			void process(float& wet)
 			{
-				fWet = firstOrderFilter.process(fWet); // First high-pass biquad stage.
-				fWet = secondOrderFilter.process(fWet); // Second high-pass biquad stage.
+				wet = firstOrderFilter.process(wet); // First high-pass biquad stage.
+				wet = secondOrderFilter.process(wet); // Second high-pass biquad stage.
 			}
 
 		private:
@@ -349,34 +343,34 @@ public:
 		class MyIirFilter
 		{
 		public:
-			void set(float fFrequency, float fQ, float sampleRate)
+			void set(float f, float q, float sampleRate)
 			{
-				// Map normalised frequency and Q parameters to musical ranges.
-				float fFrequencyHz = mapFrequency(fFrequency, sampleRate);
-				float fQValue = mapQ(fQ);
+				// Use f directly in Hz and map q parameter to musical range.
+				float fFrequencyHz = clampFrequencyHz(f, sampleRate);
+				float fQValue = mapQFromNormalised(q);
 				float fOmega = (2.0f * 3.14159265359f * fFrequencyHz) / sampleRate;
 				float fSinOmega = sinf(fOmega);
 				float fCosOmega = cosf(fOmega);
 				float fAlpha = fSinOmega / (2.0f * fQValue);
 
-				float b0 = fAlpha;
-				float b1 = 0.0f;
-				float b2 = -fAlpha;
-				float a0 = 1.0f + fAlpha;
-				float a1 = -2.0f * fCosOmega;
-				float a2 = 1.0f - fAlpha;
+				float fB0 = fAlpha;
+				float fB1 = 0.0f;
+				float fB2 = -fAlpha;
+				float fA0 = 1.0f + fAlpha;
+				float fA1 = -2.0f * fCosOmega;
+				float fA2 = 1.0f - fAlpha;
 
-				setTargets(b0, b1, b2, a0, a1, a2);
+				setCoeffTargets(fB0, fB1, fB2, fA0, fA1, fA2);
 			}
 
 			float process(float input)
 			{
 				// Smooth coefficients to avoid zipper noise when parameters move.
-				smoothCoeffs();
+				smoothCoefficientTargets();
 
 				// Process filter sample here using the biquad difference equation.
-				float fOutput = (fCurrentB0 * input) + (fCurrentB1 * fPreviousInput1) + (fCurrentB2 * fPreviousInput2)
-					- (fCurrentA1 * fPreviousOutput1) - (fCurrentA2 * fPreviousOutput2);
+				float fOutput = (fCurrentB0Coeff * input) + (fCurrentB1Coeff * fPreviousInput1) + (fCurrentB2Coeff * fPreviousInput2)
+					- (fCurrentA1Coeff * fPreviousOutput1) - (fCurrentA2Coeff * fPreviousOutput2);
 				fPreviousInput2 = fPreviousInput1;
 				fPreviousInput1 = input;
 				fPreviousOutput2 = fPreviousOutput1;
@@ -387,65 +381,65 @@ public:
 		private:
 			// Declare your internal firstOrderFilter variables here
 
-			float mapFrequency(float fFrequency, float sampleRate)
+			float clampFrequencyHz(float f, float sampleRate)
 			{
-				if (fFrequency < 0.0f) fFrequency = 0.0f;
-				if (fFrequency > 1.0f) fFrequency = 1.0f;
 				float fMinHz = 20.0f;
 				float fMaxHz = sampleRate * 0.45f;
 				if (fMaxHz < fMinHz) fMaxHz = fMinHz;
-				return fMinHz * powf(fMaxHz / fMinHz, fFrequency);
+				if (f < fMinHz) f = fMinHz;
+				if (f > fMaxHz) f = fMaxHz;
+				return f;
 			}
 
-			float mapQ(float fQ)
+			float mapQFromNormalised(float q)
 			{
-				if (fQ < 0.0f) fQ = 0.0f;
-				if (fQ > 1.0f) fQ = 1.0f;
-				return 0.3f + (fQ * (12.0f - 0.3f));
+				if (q < 0.0f) q = 0.0f;
+				if (q > 1.0f) q = 1.0f;
+				return 0.3f + (q * (12.0f - 0.3f));
 			}
 
-			void setTargets(float b0, float b1, float b2, float a0, float a1, float a2)
+			void setCoeffTargets(float b0, float b1, float b2, float A0, float A1, float A2)
 			{
-				fTargetB0 = b0 / a0;
-				fTargetB1 = b1 / a0;
-				fTargetB2 = b2 / a0;
-				fTargetA1 = a1 / a0;
-				fTargetA2 = a2 / a0;
+				fTargetB0Coeff = b0 / A0;
+				fTargetB1Coeff = b1 / A0;
+				fTargetB2Coeff = b2 / A0;
+				fTargetA1Coeff = A1 / A0;
+				fTargetA2Coeff = A2 / A0;
 
-				if (!bHasInitialised)
+				if (!bHasInitialisedCoeffs)
 				{
-					fCurrentB0 = fTargetB0;
-					fCurrentB1 = fTargetB1;
-					fCurrentB2 = fTargetB2;
-					fCurrentA1 = fTargetA1;
-					fCurrentA2 = fTargetA2;
-					bHasInitialised = true;
+					fCurrentB0Coeff = fTargetB0Coeff;
+					fCurrentB1Coeff = fTargetB1Coeff;
+					fCurrentB2Coeff = fTargetB2Coeff;
+					fCurrentA1Coeff = fTargetA1Coeff;
+					fCurrentA2Coeff = fTargetA2Coeff;
+					bHasInitialisedCoeffs = true;
 				}
 			}
 
-			void smoothCoeffs()
+			void smoothCoefficientTargets()
 			{
-				fCurrentB0 += (fTargetB0 - fCurrentB0) * fCoeffSmoothing;
-				fCurrentB1 += (fTargetB1 - fCurrentB1) * fCoeffSmoothing;
-				fCurrentB2 += (fTargetB2 - fCurrentB2) * fCoeffSmoothing;
-				fCurrentA1 += (fTargetA1 - fCurrentA1) * fCoeffSmoothing;
-				fCurrentA2 += (fTargetA2 - fCurrentA2) * fCoeffSmoothing;
+				fCurrentB0Coeff += (fTargetB0Coeff - fCurrentB0Coeff) * fCoeffSmoothing;
+				fCurrentB1Coeff += (fTargetB1Coeff - fCurrentB1Coeff) * fCoeffSmoothing;
+				fCurrentB2Coeff += (fTargetB2Coeff - fCurrentB2Coeff) * fCoeffSmoothing;
+				fCurrentA1Coeff += (fTargetA1Coeff - fCurrentA1Coeff) * fCoeffSmoothing;
+				fCurrentA2Coeff += (fTargetA2Coeff - fCurrentA2Coeff) * fCoeffSmoothing;
 			}
 
-			bool bHasInitialised = false;
+			bool bHasInitialisedCoeffs = false;
 			float fCoeffSmoothing = 0.0025f;
 
-			float fCurrentB0 = 1.0f;
-			float fCurrentB1 = 0.0f;
-			float fCurrentB2 = 0.0f;
-			float fCurrentA1 = 0.0f;
-			float fCurrentA2 = 0.0f;
+			float fCurrentB0Coeff = 1.0f;
+			float fCurrentB1Coeff = 0.0f;
+			float fCurrentB2Coeff = 0.0f;
+			float fCurrentA1Coeff = 0.0f;
+			float fCurrentA2Coeff = 0.0f;
 
-			float fTargetB0 = 1.0f;
-			float fTargetB1 = 0.0f;
-			float fTargetB2 = 0.0f;
-			float fTargetA1 = 0.0f;
-			float fTargetA2 = 0.0f;
+			float fTargetB0Coeff = 1.0f;
+			float fTargetB1Coeff = 0.0f;
+			float fTargetB2Coeff = 0.0f;
+			float fTargetA1Coeff = 0.0f;
+			float fTargetA2Coeff = 0.0f;
 
 			float fPreviousInput1 = 0.0f;
 			float fPreviousInput2 = 0.0f;
@@ -457,16 +451,16 @@ public:
 		{
 		public:
 
-			void set(float fFrequency, float fQ, float sampleRate)
+			void set(float f, float q, float sampleRate)
 			{
-				firstOrderFilter.set(fFrequency, fQ, sampleRate);
-				secondOrderFilter.set(fFrequency, fQ, sampleRate);
+				firstOrderFilter.set(f, q, sampleRate);
+				secondOrderFilter.set(f, q, sampleRate);
 			}
 
-			void process(float& fWet)
+			void process(float& wet)
 			{
-				fWet = firstOrderFilter.process(fWet); // First band-pass biquad stage.
-				fWet = secondOrderFilter.process(fWet); // Second band-pass biquad stage.
+				wet = firstOrderFilter.process(wet); // First band-pass biquad stage.
+				wet = secondOrderFilter.process(wet); // Second band-pass biquad stage.
 			}
 
 		private:
@@ -478,14 +472,14 @@ public:
 		{
 		public:
 
-			void set(float fFrequency, float fQ, float sampleRate)
+			void set(float f, float q, float sampleRate)
 			{
-				for (int i = 0; i < 2; ++i) biQuadFilter[i].set(fFrequency, fQ, sampleRate);
+				for (int i = 0; i < 2; ++i) biQuadFilter[i].set(f, q, sampleRate);
 			}
 
-			void process(float& fWet)
+			void process(float& wet)
 			{
-				for (int i = 0; i < 2; ++i) biQuadFilter[i].process(fWet); // 2-stage band-pass cascade.
+				for (int i = 0; i < 2; ++i) biQuadFilter[i].process(wet); // 2-stage band-pass cascade.
 			}
 
 		private:
