@@ -32,16 +32,16 @@ extern "C" {
             {   "Input Gain",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE  },
 
             {   "LPF Gain",  Parameter::ROTARY, 0.0, 2.0, 1.0, AUTO_SIZE  },
-            {   "LPF Cutoff",  Parameter::ROTARY, 20.0, 20000.0, 2000.0, AUTO_SIZE  },
+            {   "LPF Cutoff",  Parameter::ROTARY, 0.0, 1.0, 0.75, AUTO_SIZE  },
 			{   "LPF On/Off",  Parameter::TOGGLE, 0.0, 1.0, 1.0, AUTO_SIZE  },
 
             {   "BPF Gain",  Parameter::ROTARY, 0.0, 2.0, 1.0, AUTO_SIZE  },
             {   "BPF Q",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE },
-            {   "BPF Frequency",  Parameter::ROTARY, 20.0, 20000.0, 1000.0, AUTO_SIZE },
+            {   "BPF Frequency",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE },
 			{   "BPF On/Off",  Parameter::TOGGLE, 0.0, 1.0, 1.0, AUTO_SIZE },
 
             {   "HPF Gain",  Parameter::ROTARY, 0.0, 2.0, 1.0, AUTO_SIZE  },
-            {   "HPF Cutoff",  Parameter::ROTARY, 20.0, 20000.0, 200.0, AUTO_SIZE  },
+            {   "HPF Cutoff",  Parameter::ROTARY, 0.0, 1.0, 0.75, AUTO_SIZE  },
 			{   "HPF On/Off",  Parameter::TOGGLE, 0.0, 1.0, 1.0, AUTO_SIZE  },
 
             {   "Output Gain",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE  },
