@@ -22,6 +22,9 @@ public:
     void setSampleRate(float sampleRate){ stk::Stk::setSampleRate(sampleRate); }
     float getSampleRate() const { return stk::Stk::sampleRate(); };
 
+    void setupFilters(float fLpfCutoff, float fBpfFrequency, float fBpfQ, float fBpfBandwidth, float fHpfCutoff);
+    void processFilters(float fLpfOnOff, int ch, float& fWet, float fLpfGain, float fBpfOnOff, float fBpfGain, float fHpfOnOff, float fHpfGain);
+
     void process(const float** inputBuffers, float** outputBuffers, int numSamples);
     
     void presetLoaded(int iPresetNum, const char *sPresetName);
@@ -31,5 +34,7 @@ public:
 private:
     // Declare shared member variables here
 
-	MyFilters filters[2]; // Two instances of MyFilters for stereo processing
+	MyFilters::MyLowPassFilter::MyBiQuadFilter LPF[2]; // Stereo 4-pole lowpass filter (2 channels, 4 filters per channel)
+	MyFilters::MyBandPassFilter::MyBiQuadFilter BPF[2]; // Stereo 4-pole bandpass filter (2 channels, 4 filters per channel)
+	MyFilters::MyHighPassFilter::MyBiQuadFilter HPF[2]; // Stereo 4-pole highpass filter (2 channels, 4 filters per channel)
 };
