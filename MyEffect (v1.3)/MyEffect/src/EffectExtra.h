@@ -17,6 +17,11 @@ public:
 		class MyLowPassFilter
 		{
 		public:
+			void reset()
+			{
+				fPreviousOutputFirst = fPreviousOutputSecond = 0.0f;
+			}
+
 			void set(float coeff)
 			{
 				// Initialise your firstOrderFilter variables here
@@ -104,7 +109,7 @@ public:
 
 				if (fLowCutoff < 0.0f) fLowCutoff = 0.0f;
 				if (fHighCutoff > 1.0f) fHighCutoff = 1.0f;
-				if (fHighCutoff < fLowCutoff) fHighCutoff = fLowCutoff;
+				if (fHighCutoff < fLowCutoff) fHighCutoff = fLowCutoff; // Ens
 
 				for (int i = 0; i < 4; ++i)
 				{
@@ -113,13 +118,13 @@ public:
 				}
 			}
 
-			void process(float& fWet)
+			float process(float& fWet)
 			{
-				// High-pass first to remove low-frequency content below the band.
-				for (int i = 0; i < 4; ++i) HPF[i].process(fWet);
-
-				// Low-pass second to remove high-frequency content above the band.
-				for (int i = 0; i < 4; ++i) LPF[i].process(fWet);
+				for (int i = 0; i < 4; ++i)
+				{
+					HPF[i].process(fWet); // Apply high-pass filter first
+					LPF[i].process(fWet); // Then apply low-pass filter
+				}
 			}
 
 		private:

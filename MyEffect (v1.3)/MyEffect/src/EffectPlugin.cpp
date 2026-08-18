@@ -29,22 +29,22 @@ extern "C" {
         
         const Parameters CONTROLS = {
             //  name,       type,              min, max, initial, size
-            {   "Input Gain",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE  },
+            {   "Input Gain",  Parameter::ROTARY, 0.0, 1.0f, 1.0f, AUTO_SIZE  },
 
-            {   "LPF Gain",  Parameter::ROTARY, 0.0, 2.0, 1.0, AUTO_SIZE  },
-            {   "LPF Cutoff",  Parameter::ROTARY, 0.0, 1.0, 0.75, AUTO_SIZE  },
-			{   "LPF On/Off",  Parameter::TOGGLE, 0.0, 1.0, 1.0, AUTO_SIZE  },
+            {   "LPF Gain",  Parameter::ROTARY, 0.0, 2.0f, 1.0f, AUTO_SIZE  },
+            {   "LPF Cutoff",  Parameter::ROTARY, 0.0, 1.0f, 0.75f, AUTO_SIZE  },
+			{   "LPF On/Off",  Parameter::TOGGLE, 0.0, 1.0f, 1.0f, AUTO_SIZE  },
 
-            {   "BPF Gain",  Parameter::ROTARY, 0.0, 2.0, 1.0, AUTO_SIZE  },
-            {   "BPF Q",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE },
-            {   "BPF Frequency",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE },
-			{   "BPF On/Off",  Parameter::TOGGLE, 0.0, 1.0, 1.0, AUTO_SIZE },
+            {   "BPF Gain",  Parameter::ROTARY, 0.0, 2.0f, 1.0f, AUTO_SIZE  },
+            {   "BPF Q",  Parameter::ROTARY, 0.0, 1.0f, 0.5f, AUTO_SIZE },
+            {   "BPF Frequency",  Parameter::ROTARY, 0.0, 1.0f, 0.5f, AUTO_SIZE },
+			{   "BPF On/Off",  Parameter::TOGGLE, 0.0, 1.0f, 1.0f, AUTO_SIZE },
 
-            {   "HPF Gain",  Parameter::ROTARY, 0.0, 2.0, 1.0, AUTO_SIZE  },
-            {   "HPF Cutoff",  Parameter::ROTARY, 0.0, 1.0, 0.75, AUTO_SIZE  },
-			{   "HPF On/Off",  Parameter::TOGGLE, 0.0, 1.0, 1.0, AUTO_SIZE  },
+            {   "HPF Gain",  Parameter::ROTARY, 0.0, 2.0f, 1.0f, AUTO_SIZE  },
+            {   "HPF Cutoff",  Parameter::ROTARY, 0.0, 1.0f, 0.75f, AUTO_SIZE  },
+			{   "HPF On/Off",  Parameter::TOGGLE, 0.0, 1.0f, 1.0f, AUTO_SIZE  },
 
-            {   "Output Gain",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE  },
+            {   "Output Gain",  Parameter::ROTARY, 0.0, 1.0f, 1.0f, AUTO_SIZE  },
         };
 
         const Presets PRESETS = {
@@ -128,23 +128,27 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 			fIn[ch] = *pfInBuffer[ch]++;
 
 			// Add your effect processing here
-			float fWet = fIn[ch] * fInGain * 0.5f;
+			float fWet = fIn[ch] * fInGain;
+
+            float fOldWet = fWet;
 
 			if (fLpfOnOff < 0.5f)
 			{
 				LPF[ch].process(fWet);
 				fWet *= fLpfGain;
 			}
-			if (fBpfOnOff < 0.5f)
-			{
-				BPF[ch].process(fWet);
-				fWet *= fBpfGain;
-			}
+
 			if (fHpfOnOff < 0.5f)
 			{
 				HPF[ch].process(fWet);
 				fWet *= fHpfGain;
 			}
+
+            if (fBpfOnOff < 0.5f)
+            {
+                fWet = (BPF[ch].process(fOldWet) + fWet) / 2.0f;
+                fWet *= fBpfGain;
+            }
 
 			fOut[ch] = fWet * fOutGain;
 
