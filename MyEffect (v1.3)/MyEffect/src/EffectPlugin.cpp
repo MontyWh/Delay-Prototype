@@ -38,7 +38,6 @@ extern "C" {
             {   "BPF Gain",  Parameter::ROTARY, 0.0, 2.0, 1.0, AUTO_SIZE  },
             {   "BPF Q",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE },
             {   "BPF Frequency",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE },
-            {   "BPF Bandwidth",  Parameter::ROTARY, 0.0, 1.0, 0.5, AUTO_SIZE },
 			{   "BPF On/Off",  Parameter::TOGGLE, 0.0, 1.0, 1.0, AUTO_SIZE },
 
             {   "HPF Gain",  Parameter::ROTARY, 0.0, 2.0, 1.0, AUTO_SIZE  },
@@ -63,13 +62,6 @@ MyEffect::MyEffect(const Parameters& parameters, const Presets& presets)
 : Effect(parameters, presets)
 {
     // Initialise member variables, etc.
-    float fSampleRate = getSampleRate();
-    for (int ch = 0; ch < 2; ch++)
-    {
-        LPF[ch].setSampleRate(fSampleRate);
-        BPF[ch].setSampleRate(fSampleRate);
-        HPF[ch].setSampleRate(fSampleRate);
-    }
 }
 
 // Destructor: called when the effect is terminated / unloaded
@@ -96,35 +88,6 @@ void MyEffect::buttonPressed(int iButton)
     // A button, with index iButton, has been pressed
 }
 
-void MyEffect::setupFilters(float fLpfCutoff, float fBpfFrequency, float fBpfQ, float fBpfBandwidth, float fHpfCutoff)
-{
-    for (int ch = 0; ch < 2; ch++)
-    {
-        LPF[ch].set(fLpfCutoff);
-        BPF[ch].set(fBpfFrequency, fBpfQ, fBpfBandwidth);
-        HPF[ch].set(fHpfCutoff);
-    }
-}
-
-void MyEffect::processFilters(float fLpfOnOff, int ch, float& fWet, float fLpfGain, float fBpfOnOff, float fBpfGain, float fHpfOnOff, float fHpfGain)
-{
-	if (fLpfOnOff > 0.5f)
-	{
-		LPF[ch].process(fWet);
-		fWet *= fLpfGain;
-	}
-	if (fBpfOnOff > 0.5f)
-	{
-		BPF[ch].process(fWet);
-		fWet *= fBpfGain;
-	}
-	if (fHpfOnOff > 0.5f)
-	{
-		HPF[ch].process(fWet);
-		fWet *= fHpfGain;
-	}
-}
-
 // Applies audio processing to a buffer of audio
 // (inputBuffer contains the input audio, and processed samples should be stored in outputBuffer)
 void MyEffect::process(const float** inputBuffers, float** outputBuffers, int numSamples)
@@ -142,16 +105,20 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 	float fBpfGain = parameters[4];
 	float fBpfQ = parameters[5];
 	float fBpfFrequency = parameters[6];
-	float fBpfBandwidth = parameters[7];
-	float fBpfOnOff = parameters[8];
+	float fBpfOnOff = parameters[7];
     
-	float fHpfGain = parameters[9];
-    float fHpfCutoff = parameters[10];
-	float fHpfOnOff = parameters[11];
+	float fHpfGain = parameters[8];
+    float fHpfCutoff = parameters[9];
+	float fHpfOnOff = parameters[10];
 
-	float fOutGain = parameters[12];
+	float fOutGain = parameters[11];
 
-    setupFilters(fLpfCutoff, fBpfFrequency, fBpfQ, fBpfBandwidth, fHpfCutoff);
+	for (int ch = 0; ch < 2; ch++)
+	{
+		LPF[ch].set(fLpfCutoff);
+		BPF[ch].set(fBpfFrequency, fBpfQ);
+		HPF[ch].set(fHpfCutoff);
+	}
 
 	for (int i = 0; i < numSamples; i++)
 	{
@@ -163,7 +130,21 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 			// Add your effect processing here
 			float fWet = fIn[ch] * fInGain * 0.5f;
 
-            processFilters(fLpfOnOff, ch, fWet, fLpfGain, fBpfOnOff, fBpfGain, fHpfOnOff, fHpfGain);
+			if (fLpfOnOff < 0.5f)
+			{
+				LPF[ch].process(fWet);
+				fWet *= fLpfGain;
+			}
+			if (fBpfOnOff < 0.5f)
+			{
+				BPF[ch].process(fWet);
+				fWet *= fBpfGain;
+			}
+			if (fHpfOnOff < 0.5f)
+			{
+				HPF[ch].process(fWet);
+				fWet *= fHpfGain;
+			}
 
 			fOut[ch] = fWet * fOutGain;
 
