@@ -152,7 +152,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 				}
 			}
 
-			if (fHpfOnOff <= 0.5f)
+			/*if (fHpfOnOff <= 0.5f)
 			{
 				float fFiltered = HPF[ch].process(fHpfSig);
 
@@ -168,7 +168,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 					float shelfGain = (fHpfGain - 0.5f) * 2.0f;  // 0.0 to 1.0
 					fHpfSig = fHpfSig + (fHpfSig - fFiltered) * shelfGain;
 				}
-			}
+			}*/
 
 			if (fBpfOnOff <= 0.5f)
 			{
@@ -182,9 +182,9 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 				}
 				else
 				{
-					// Shelf mode: boost band frequencies
+					// Shelf mode: boost low frequencies
 					float shelfGain = (fBpfGain - 0.5f) * 2.0f;  // 0.0 to 1.0
-					fBpfSig = fBpfSig + fFiltered * (shelfGain * 5.0f);
+					fBpfSig = fWet + (fWet - fFiltered) * shelfGain;
 				}
 			}
 
