@@ -36,16 +36,18 @@ public:
 				return fOutput;
 			}
 
-			void process(float& fWet)
+			float process(float output)
 			{
 				// Filter individual samples here - 𝑦0 = 𝑎𝑥0 + 𝑏𝑦-1
-				float fFirst = (fWet * fCurrentACoeff) + (fPreviousOutputFirst * fPreviousBCoeff);
+				float fFirst = (output * fCurrentACoeff) + (fPreviousOutputFirst * fPreviousBCoeff);
 				fPreviousOutputFirst = fFirst;  // Store for next sample
 
 				float fSecond = (fFirst * fCurrentACoeff) + (fPreviousOutputSecond * fPreviousBCoeff);
 				fPreviousOutputSecond = fSecond;  // Store for next sample
 
-				fWet = fSecond;
+				output = fSecond;
+
+				return output;
 			}
 
 		private:
@@ -74,7 +76,7 @@ public:
 				return fOutput;
 			}
 
-			void process(float& fWet)
+			float process(float& fWet)
 			{
 				// Filter individual samples here - 𝑦0 = 𝑎𝑥0 + 𝑏𝑦-1
 				float fLowPassFirst = (fWet * fCurrentACoeff) + (fPreviousOutputFirst * fPreviousBCoeff);
@@ -118,12 +120,12 @@ public:
 				}
 			}
 
-			float process(float& fWet)
+			float process(float& input)
 			{
 				for (int i = 0; i < 4; ++i)
 				{
-					HPF[i].process(fWet); // Apply high-pass filter first
-					LPF[i].process(fWet); // Then apply low-pass filter
+					HPF[i].process(input); // Apply high-pass filter
+					LPF[i].process(input); // Then apply low-pass filter
 				}
 			}
 

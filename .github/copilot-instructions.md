@@ -2,6 +2,7 @@
 
 ## Project Guidelines
 - User prefers code changes to follow their existing style, language, naming, and formatting conventions closely.
+- User prefers code and comments to match their existing style, language, formatting, spelling, and tone.
 - User prefers subtle, incremental code adaptations that preserve their existing style, naming, and comments so changes feel true to their code voice. Code should be provided in chat before direct file edits.
 - User prefers subtle, incremental adaptations that preserve their existing C++ naming style, class nesting, and comment format when discussing filter refactors.
 - User prefers code changes to stay in their existing style, format, and language, with subtle incremental fixes rather than stylistic rewrites.
