@@ -100,16 +100,16 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 	float fLpfGain = pow(parameters[1], 3.0f);
 	float fLpfCutoff = pow(parameters[2], 3.0f);
-	float fLpfOnOff = pow(parameters[3], 3.0f);
+	float fLpfOnOff = parameters[3];
 
 	float fBpfGain = pow(parameters[4], 3.0f);
 	float fBpfQ = pow(parameters[5], 3.0f);
 	float fBpfFrequency = pow(parameters[6], 3.0f);
-	float fBpfOnOff = pow(parameters[7], 3.0f);
+	float fBpfOnOff = parameters[7];
 
 	float fHpfGain = pow(1.0f - parameters[8], 3.0f);
 	float fHpfCutoff = pow(parameters[9], 3.0f);
-	float fHpfOnOff = pow(parameters[10], 3.0f);
+	float fHpfOnOff = parameters[10];
 
 	float fOutGain = pow(parameters[11], 3.0f);
 

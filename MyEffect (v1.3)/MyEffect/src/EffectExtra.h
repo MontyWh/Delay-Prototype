@@ -126,6 +126,8 @@ public:
 				{
 					HPF[i].process(input); // Apply high-pass filter
 					LPF[i].process(input); // Then apply low-pass filter
+
+					return input;
 				}
 			}
 
