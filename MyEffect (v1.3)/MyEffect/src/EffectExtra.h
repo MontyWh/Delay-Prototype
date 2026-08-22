@@ -36,18 +36,16 @@ public:
 				return fOutput;
 			}
 
-			float process(float output)
+			float process(float input)
 			{
 				// Filter individual samples here - 𝑦0 = 𝑎𝑥0 + 𝑏𝑦-1
-				float fFirst = (output * fCurrentACoeff) + (fPreviousOutputFirst * fPreviousBCoeff);
+				float fFirst = (input * fCurrentACoeff) + (fPreviousOutputFirst * fPreviousBCoeff);
 				fPreviousOutputFirst = fFirst;  // Store for next sample
 
 				float fSecond = (fFirst * fCurrentACoeff) + (fPreviousOutputSecond * fPreviousBCoeff);
 				fPreviousOutputSecond = fSecond;  // Store for next sample
 
-				output = fSecond;
-
-				return output;
+				return fSecond;
 			}
 
 		private:
@@ -76,17 +74,17 @@ public:
 				return fOutput;
 			}
 
-			float process(float& fWet)
+			float process(float input)
 			{
 				// Filter individual samples here - 𝑦0 = 𝑎𝑥0 + 𝑏𝑦-1
-				float fLowPassFirst = (fWet * fCurrentACoeff) + (fPreviousOutputFirst * fPreviousBCoeff);
+				float fLowPassFirst = (input * fCurrentACoeff) + (fPreviousOutputFirst * fPreviousBCoeff);
 				fPreviousOutputFirst = fLowPassFirst;  // Store for next sample
-				float fFirst = fWet - fLowPassFirst;
+				float fFirst = input - fLowPassFirst;
 
 				float fLowPassSecond = (fFirst * fCurrentACoeff) + (fPreviousOutputSecond * fPreviousBCoeff);
 				fPreviousOutputSecond = fLowPassSecond;  // Store for next sample
 
-				fWet = fFirst - fLowPassSecond;
+				return fFirst - fLowPassSecond;
 			}
 
 		private:
@@ -101,34 +99,38 @@ public:
 		class MyBandPassFilter
 		{
 		public:
-			void set(float fFrequency, float fQ)
+			void set(float frequency, float q)
 			{
-				// Calculate band edges from centre frequency and Q value
-				if (fQ < 0.001f) fQ = 0.001f;
-				float fBandwidth = fFrequency / fQ;
-				float fLowCutoff = fFrequency - (fBandwidth * 0.5f);
-				float fHighCutoff = fFrequency + (fBandwidth * 0.5f);
+				float minQ = 0.1f;
+				float maxQ = 100.0f;
+				float mappedQ = minQ * pow(maxQ / minQ, q); // Map Q from 0.0-1.0 to minQ-maxQ range
 
-				if (fLowCutoff < 0.0f) fLowCutoff = 0.0f;
-				if (fHighCutoff > 1.0f) fHighCutoff = 1.0f;
-				if (fHighCutoff < fLowCutoff) fHighCutoff = fLowCutoff; // Ens
+				float bandwidth = frequency / mappedQ; // Calculate bandwidth based on frequency and Q
+
+				// Calculate cutoff coefficients
+				float fLowCutoff = frequency - (bandwidth * 0.5f);  // Below center
+				float fHighCutoff = frequency + (bandwidth * 0.5f); // Above center
+
+				// Clamp to valid coefficient range
+				fLowCutoff = fmax(0.001f, fmin(fLowCutoff, 0.999f));
+				fHighCutoff = fmax(0.001f, fmin(fHighCutoff, 0.999f));
 
 				for (int i = 0; i < 4; ++i)
 				{
-					HPF[i].set(fLowCutoff);
-					LPF[i].set(fHighCutoff);
+					HPF[i].set(fLowCutoff);  // Remove frequencies below
+					LPF[i].set(fHighCutoff); // Remove frequencies above
 				}
 			}
 
-			float process(float& input)
+			float process(float input)
 			{
+				float output = input;
 				for (int i = 0; i < 4; ++i)
 				{
-					HPF[i].process(input); // Apply high-pass filter
-					LPF[i].process(input); // Then apply low-pass filter
-
-					return input;
+					output = HPF[i].process(output);
+					output = LPF[i].process(output);
 				}
+				return output;
 			}
 
 		private:

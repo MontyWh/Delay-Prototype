@@ -31,16 +31,16 @@ extern "C" {
 			//  name,       type,              min, max, initial, size
 			{   "Input Gain",  Parameter::ROTARY, 0.0, 1.0f, 1.0f, AUTO_SIZE  },
 
-			{   "LPF Gain",  Parameter::ROTARY, 0.0f, 1.0f, 0.0f, AUTO_SIZE},
+			{   "LPF Gain",  Parameter::ROTARY, 0.0f, 1.0f, 0.5f, AUTO_SIZE},
 			{   "LPF Cutoff",  Parameter::ROTARY, 0.0, 1.0f, 0.25f, AUTO_SIZE  },
 			{   "LPF On/Off",  Parameter::TOGGLE, 0.0, 1.0f, 1.0f, AUTO_SIZE  },
 
-			{   "BPF Gain",  Parameter::ROTARY, 0.0f, 1.0f, 0.0f, AUTO_SIZE  },
+			{   "BPF Gain",  Parameter::ROTARY, 0.0f, 1.0f, 0.5f, AUTO_SIZE  },
 			{   "BPF Q",  Parameter::ROTARY, 0.0, 1.0f, 0.75f, AUTO_SIZE },
 			{   "BPF Frequency",  Parameter::ROTARY, 0.0, 1.0f, 0.75f, AUTO_SIZE },
 			{   "BPF On/Off",  Parameter::TOGGLE, 0.0, 1.0f, 1.0f, AUTO_SIZE },
 
-			{   "HPF Gain",  Parameter::ROTARY, 0.0f, 1.0f, 0.75f, AUTO_SIZE  },
+			{   "HPF Gain",  Parameter::ROTARY, 0.0f, 1.0f, 0.5f, AUTO_SIZE  },
 			{   "HPF Cutoff",  Parameter::ROTARY, 0.0, 1.0f, 0.75f, AUTO_SIZE  },
 			{   "HPF On/Off",  Parameter::TOGGLE, 0.0, 1.0f, 1.0f, AUTO_SIZE  },
 
@@ -103,7 +103,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 	float fLpfOnOff = parameters[3];
 
 	float fBpfGain = pow(parameters[4], 3.0f);
-	float fBpfQ = pow(parameters[5], 3.0f);
+	float fBpfQ = pow(parameters[5], 10.0f);
 	float fBpfFrequency = pow(parameters[6], 3.0f);
 	float fBpfOnOff = parameters[7];
 
@@ -134,7 +134,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 			float fBpfSig = fWet;
 			float fHpfSig = fWet;
 
-			if (fLpfOnOff <= 0.5f)
+			/*if (fLpfOnOff <= 0.5f)
 			{
 				float fFiltered = LPF[ch].process(fLpfSig);
 
@@ -150,7 +150,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 					float shelfGain = (fLpfGain - 0.5f) * 2.0f;  // 0.0 to 1.0
 					fLpfSig = fWet + (fWet - fFiltered) * shelfGain;
 				}
-			}
+			}*/
 
 			/*if (fHpfOnOff <= 0.5f)
 			{
@@ -172,23 +172,23 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 			if (fBpfOnOff <= 0.5f)
 			{
-				float fFiltered = BPF[ch].process(fBpfSig);
+				float fFiltered = BPF[ch].process(fWet);
 
-				if (fBpfGain < 0.5f)
+				if (fBpfGain <= 0.5f)
 				{
-					// Filter mode: blend from filtered to dry
-					float blend = fBpfGain * 2.0f;  // 0.0 to 1.0
-					fBpfSig = fFiltered * (1.0f - blend) + fBpfSig * blend;
+					// 0.0 = full filter, 0.5 = unchanged (0 dB)
+					fBpfGain *= 2.0f;
+					fBpfSig = fFiltered * (1.0f - fBpfGain) + (fWet * fBpfGain);
 				}
 				else
 				{
-					// Shelf mode: boost low frequencies
-					float shelfGain = (fBpfGain - 0.5f) * 2.0f;  // 0.0 to 1.0
-					fBpfSig = fWet + (fWet - fFiltered) * shelfGain;
+					// 0.5 = unchanged (0 dB), 1.0 = full shelf boost
+					fBpfGain = (fBpfGain - 0.5f) * 2.0f;
+					fBpfSig = fWet + (fFiltered * fBpfGain);
 				}
 			}
 
-			fWet = fLpfSig * fBpfSig * fHpfSig;
+			fWet = /*fLpfSig * */fBpfSig/* * fHpfSig*/;
 
 			fOut[ch] = fWet * fOutGain;
 

@@ -321,6 +321,7 @@
     <None Include="include\stk\SKINI.tbl">
       <Filter>Library Files\Synthesis Toolkit %28STK%29\Objects</Filter>
     </None>
+    <None Include=".github\copilot-instructions.md" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="MyEffect.rc">
