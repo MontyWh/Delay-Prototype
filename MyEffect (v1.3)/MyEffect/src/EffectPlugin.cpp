@@ -174,17 +174,19 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 			{
 				float fFiltered = BPF[ch].process(fWet);
 
+				// Calculate blend factor ONCE, before using it on each sample
+				float fBlend;
 				if (fBpfGain <= 0.5f)
 				{
 					// 0.0 = full filter, 0.5 = unchanged (0 dB)
-					fBpfGain *= 2.0f;
-					fBpfSig = fFiltered * (1.0f - fBpfGain) + (fWet * fBpfGain);
+					fBlend = fBpfGain * 2.0f;
+					fBpfSig = fFiltered * (1.0f - fBlend) + (fWet * fBlend);
 				}
 				else
 				{
 					// 0.5 = unchanged (0 dB), 1.0 = full shelf boost
-					fBpfGain = (fBpfGain - 0.5f) * 2.0f;
-					fBpfSig = fWet + (fFiltered * fBpfGain);
+					fBlend = (fBpfGain - 0.5f) * 2.0f;
+					fBpfSig = fWet + (fFiltered * fBlend);
 				}
 			}
 
