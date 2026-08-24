@@ -35,7 +35,7 @@ extern "C" {
 			{   "LPF Cutoff",  Parameter::ROTARY, 0.0, 1.0f, 0.25f, AUTO_SIZE  },
 			{   "LPF On/Off",  Parameter::TOGGLE, 0.0, 1.0f, 1.0f, AUTO_SIZE  },
 
-			{   "BPF Gain",  Parameter::ROTARY, 0.0f, 1.0f, 0.5f, AUTO_SIZE  },
+			{   "BPF Gain",  Parameter::ROTARY, 0.0f, 2.0f, 0.0f, AUTO_SIZE  },
 			{   "BPF Q",  Parameter::ROTARY, 0.0, 1.0f, 0.51f, AUTO_SIZE },
 			{   "BPF Frequency",  Parameter::ROTARY, 0.0, 1.0f, 0.75f, AUTO_SIZE },
 			{   "BPF On/Off",  Parameter::TOGGLE, 0.0, 1.0f, 1.0f, AUTO_SIZE },
@@ -102,7 +102,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 	float fLpfCutoff = pow(parameters[2], 3.0f);
 	float fLpfOnOff = parameters[3];
 
-	float fBpfGain = pow(parameters[4], 3.0f);
+	float fBpfGain = parameters[4];
 	float fBpfQ = pow(parameters[5], 2.0f);
 	float fBpfFrequency = pow(parameters[6], 3.0f);
 	float fBpfOnOff = parameters[7];
@@ -176,16 +176,16 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 				// Calculate blend factor ONCE, before using it on each sample
 				float fBlend;
-				if (fBpfGain <= 0.5f)
+				if (fBpfGain <= 1.0f)
 				{
-					// 0.0 = full filter, 0.5 = unchanged (0 dB)
-					fBlend = fBpfGain * 2.0f;
+					// 0.0 = full filter, 1.0 = unchanged (0 dB)
+					fBlend = fBpfGain;
 					fBpfSig = fFiltered * (1.0f - fBlend) + (fWet * fBlend);
 				}
 				else
 				{
-					// 0.5 = unchanged (0 dB), 1.0 = full shelf boost
-					fBlend = (fBpfGain - 0.5f) * 2.0f;
+					// 1.0 = unchanged (0 dB), 2.0 = full shelf boost
+					fBlend = fBpfGain - 1.0f;
 					fBpfSig = fWet + (fFiltered * fBlend);
 				}
 			}
