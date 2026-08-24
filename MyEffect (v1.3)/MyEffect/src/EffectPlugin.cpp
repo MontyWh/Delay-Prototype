@@ -36,7 +36,7 @@ extern "C" {
 			{   "LPF On/Off",  Parameter::TOGGLE, 0.0, 1.0f, 1.0f, AUTO_SIZE  },
 
 			{   "BPF Gain",  Parameter::ROTARY, 0.0f, 1.0f, 0.5f, AUTO_SIZE  },
-			{   "BPF Q",  Parameter::ROTARY, 0.0, 1.0f, 0.75f, AUTO_SIZE },
+			{   "BPF Q",  Parameter::ROTARY, 0.0, 1.0f, 0.51f, AUTO_SIZE },
 			{   "BPF Frequency",  Parameter::ROTARY, 0.0, 1.0f, 0.75f, AUTO_SIZE },
 			{   "BPF On/Off",  Parameter::TOGGLE, 0.0, 1.0f, 1.0f, AUTO_SIZE },
 

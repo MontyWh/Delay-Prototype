@@ -115,15 +115,35 @@ public:
 				fLowCutoff = fmax(0.001f, fmin(fLowCutoff, 0.999f));
 				fHighCutoff = fmax(0.001f, fmin(fHighCutoff, 0.999f));
 
-				for (int i = 0; i < 4; ++i)
+				fTargetLowCutoff = fLowCutoff;
+				fTargetHighCutoff = fHighCutoff;
+
+				if (!bCutoffInitialised)
 				{
-					HPF[i].set(fLowCutoff);  // Remove frequencies below
-					LPF[i].set(fHighCutoff); // Remove frequencies above
+					fCurrentLowCutoff = fTargetLowCutoff;
+					fCurrentHighCutoff = fTargetHighCutoff;
+
+					for (int i = 0; i < 4; ++i)
+					{
+						HPF[i].set(fCurrentLowCutoff);  // Remove frequencies below
+						LPF[i].set(fCurrentHighCutoff); // Remove frequencies above
+					}
+
+					bCutoffInitialised = true;
 				}
 			}
 
 			float process(float input)
 			{
+				fCurrentLowCutoff += (fTargetLowCutoff - fCurrentLowCutoff) * fCutoffSmoothingCoeff;
+				fCurrentHighCutoff += (fTargetHighCutoff - fCurrentHighCutoff) * fCutoffSmoothingCoeff;
+
+				for (int i = 0; i < 4; ++i)
+				{
+					HPF[i].set(fCurrentLowCutoff);
+					LPF[i].set(fCurrentHighCutoff);
+				}
+
 				float output = input;
 				for (int i = 0; i < 4; ++i)
 				{
@@ -136,6 +156,13 @@ public:
 		private:
 			MyHighPassFilter HPF[4];
 			MyLowPassFilter LPF[4];
+
+			float fCurrentLowCutoff = 0.001f;
+			float fCurrentHighCutoff = 0.999f;
+			float fTargetLowCutoff = 0.001f;
+			float fTargetHighCutoff = 0.999f;
+			float fCutoffSmoothingCoeff = 0.0025f;
+			bool bCutoffInitialised = false;
 		};
 	};
 };
