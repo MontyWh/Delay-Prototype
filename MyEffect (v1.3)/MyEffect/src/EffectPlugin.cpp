@@ -103,7 +103,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 	float fLpfOnOff = parameters[3];
 
 	float fBpfGain = pow(parameters[4], 3.0f);
-	float fBpfQ = pow(parameters[5], 10.0f);
+	float fBpfQ = pow(parameters[5], 2.0f);
 	float fBpfFrequency = pow(parameters[6], 3.0f);
 	float fBpfOnOff = parameters[7];
 
