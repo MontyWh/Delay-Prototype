@@ -31,8 +31,8 @@ public:
 private:
     // Declare shared member variables here
 
-	MyIirFilter::MyBiQuadFilter::MyLowPassFilter  LPF[2]; // Stereo lowpass filter  (2 channels)
-	MyIirFilter::MyBiQuadFilter::MyBandPassFilter BPF[2]; // Stereo bandpass filter (2 channels)
-	MyIirFilter::MyBiQuadFilter::MyHighPassFilter HPF[2]; // Stereo highpass filter (2 channels)
-	MyFilterGainProcessor FilterGain;
+	MyFilters::MyIirFilter::MyBiQuadFilter::MyLowPassFilter  LPF[2]; // Stereo lowpass filter  (2 channels)
+	MyFilters::MyIirFilter::MyBiQuadFilter::MyBandPassFilter BPF[2]; // Stereo bandpass filter (2 channels)
+	MyFilters::MyIirFilter::MyBiQuadFilter::MyHighPassFilter HPF[2]; // Stereo highpass filter (2 channels)
+	MyFilters::MyFilterGainProcessor FilterGain;
 };
