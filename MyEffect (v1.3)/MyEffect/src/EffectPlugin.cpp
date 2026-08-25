@@ -31,16 +31,16 @@ extern "C" {
 			//  name,       type,              min, max, initial, size
 			{   "Input Gain",  Parameter::ROTARY, 0.0, 1.0f, 1.0f, AUTO_SIZE  },
 
-			{   "LPF Gain",  Parameter::ROTARY, 0.0f, 2.0f, 1.0f, AUTO_SIZE},
+			{   "LPF Gain",  Parameter::ROTARY, 0.0f, 6.0f, 1.0f, AUTO_SIZE},
 			{   "LPF Cutoff",  Parameter::ROTARY, 0.0, 1.0f, 0.25f, AUTO_SIZE  },
 			{   "LPF On/Off",  Parameter::TOGGLE, 0.0, 1.0f, 1.0f, AUTO_SIZE  },
 
-			{   "BPF Gain",  Parameter::ROTARY, 0.0f, 2.0f, 1.0f, AUTO_SIZE  },
+			{   "BPF Gain",  Parameter::ROTARY, 0.0f, 6.0f, 1.0f, AUTO_SIZE  },
 			{   "BPF Q",  Parameter::ROTARY, 0.0, 1.0f, 0.51f, AUTO_SIZE },
 			{   "BPF Frequency",  Parameter::ROTARY, 0.0, 1.0f, 0.75f, AUTO_SIZE },
 			{   "BPF On/Off",  Parameter::TOGGLE, 0.0, 1.0f, 1.0f, AUTO_SIZE },
 
-			{   "HPF Gain",  Parameter::ROTARY, 0.0f, 2.0f, 1.0f, AUTO_SIZE  },
+			{   "HPF Gain",  Parameter::ROTARY, 0.0f, 6.0f, 1.0f, AUTO_SIZE  },
 			{   "HPF Cutoff",  Parameter::ROTARY, 0.0, 1.0f, 0.75f, AUTO_SIZE  },
 			{   "HPF On/Off",  Parameter::TOGGLE, 0.0, 1.0f, 1.0f, AUTO_SIZE  },
 
@@ -111,7 +111,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 	float fHpfCutoff = pow(parameters[9], 3.0f);
 	float fHpfOnOff = parameters[10];
 
-	float fOutGain = pow(parameters[11], 3.0f);
+	float fOutGain = pow(parameters[11], 3.0f) / 2.0f;
 
 	for (int ch = 0; ch < 2; ch++)
 	{
@@ -137,16 +137,16 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 				// Calculate blend factor ONCE, before using it on each sample
 				float fBlend;
-				if (fBpfGain <= 1.0f)
+				if (fBpfGain < 3.0f)
 				{
-					// 0.0 = full filter, 1.0 = unchanged (0 dB)
-					fBlend = fBpfGain;
+					// 0.0 = full filter, 3.0 = unchanged (0 dB)
+					fBlend = fBpfGain / 3.0f;
 					fWet = fFiltered * (1.0f - fBlend) + (fWet * fBlend);
 				}
 				else
 				{
-					// 1.0 = unchanged (0 dB), 2.0 = full shelf boost
-					fBlend = fBpfGain - 1.0f;
+					// 3.0 = unchanged (0 dB), 6.0 = full shelf boost
+					fBlend = (fBpfGain - 3.0f) / 3.0f;
 					fWet = fWet + (fFiltered * fBlend);
 				}
 			}
@@ -157,16 +157,16 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 				// Calculate blend factor ONCE, before using it on each sample
 				float fBlend;
-				if (fLpfGain <= 1.0f)
+				if (fLpfGain < 3.0f)
 				{
-					// 0.0 = full filter, 1.0 = unchanged (0 dB)
-					fBlend = fLpfGain;
+					// 0.0 = full filter, 3.0 = unchanged (0 dB)
+					fBlend = fLpfGain / 3.0f;
 					fWet = fFiltered * (1.0f - fBlend) + (fWet * fBlend);
 				}
 				else
 				{
-					// 1.0 = unchanged (0 dB), 2.0 = full shelf boost
-					fBlend = fLpfGain - 1.0f;
+					// 3.0 = unchanged (0 dB), 6.0 = full shelf boost
+					fBlend = (fLpfGain - 3.0f) / 3.0f;
 					fWet = fWet + (fFiltered * fBlend);
 				}
 			}
@@ -177,16 +177,16 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 				// Calculate blend factor ONCE, before using it on each sample
 				float fBlend;
-				if (fHpfGain <= 1.0f)
+				if (fHpfGain < 3.0f)
 				{
-					// 0.0 = full filter, 1.0 = unchanged (0 dB)
-					fBlend = fHpfGain;
+					// 0.0 = full filter, 3.0 = unchanged (0 dB)
+					fBlend = fHpfGain / 3.0f;
 					fWet = fFiltered * (1.0f - fBlend) + (fWet * fBlend);
 				}
 				else
 				{
-					// 1.0 = unchanged (0 dB), 2.0 = full shelf boost
-					fBlend = fHpfGain - 1.0f;
+					// 3.0 = unchanged (0 dB), 6.0 = full shelf boost
+					fBlend = (fHpfGain - 3.0f) / 3.0f;
 					fWet = fWet + (fFiltered * fBlend);
 				}
 			}
