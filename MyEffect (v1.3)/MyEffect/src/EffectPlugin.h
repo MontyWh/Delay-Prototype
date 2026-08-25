@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <algorithm>
+
 #include "apdi/Plugin.h"
 #include "apdi/Helpers.h"
 using namespace APDI;
@@ -32,7 +34,6 @@ private:
 	// Declare shared member variables here
 
 	myMultiLineDelay del[2];
-	MyFilters::MyIirFilter::MyBiQuadFilter::MyLowPassFilter LPF[2];
 
 	float fSampleRate;
 };

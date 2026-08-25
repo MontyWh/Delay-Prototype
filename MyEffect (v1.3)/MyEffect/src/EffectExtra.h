@@ -15,10 +15,12 @@ public:
 		fFeedbackGain = 0.0f;
 	}
 
-	void setDelayTimes(float* delayTimes, float feedbackGain)
+	void setDelayTimes(float* delayTimes, float feedbackGain, float lpfCutoff)
 	{
 		for (int d = 0; d < 3; d++) delays[d].setDelayTime(delayTimes[d]);
 		fFeedbackGain = feedbackGain;
+
+		LPF.set(lpfCutoff);
 	}
 
 	void initialiseBuffer(float sampleRate)
@@ -31,7 +33,7 @@ public:
 		float fSummedTaps = 0.0f;
 		for (int d = 0; d < 3; d++) fSummedTaps += delays[d].read(sampleRate);
 
-		float fWriteValue = input + (fSummedTaps * fFeedbackGain);
+		float fWriteValue = input + LPF.process(fSummedTaps * fFeedbackGain);
 		for (int d = 0; d < 3; d++) delays[d].write(fWriteValue);
 
 		return input + fSummedTaps;
@@ -105,6 +107,8 @@ private:
 
 	MyDelay delays[3];
 	float fFeedbackGain;
+
+	MyFilters::MyIirFilter::MyBiQuadFilter::MyLowPassFilter LPF;
 };
 
 

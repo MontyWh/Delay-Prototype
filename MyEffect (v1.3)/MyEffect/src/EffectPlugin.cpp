@@ -29,13 +29,18 @@ extern "C" {
         
         const Parameters CONTROLS = {
             //  name,       type,              min, max, initial, size
-            {   "Input Gain",  Parameter::SLIDER, 0.0, 1.0, 0.5, AUTO_SIZE  },
-            {   "Delay Time 1",  Parameter::ROTARY, 0.001, 0.1, 0.025, AUTO_SIZE  },
-			{   "Delay Time 2",  Parameter::ROTARY, 0.001, 0.1, 0.05, AUTO_SIZE  },
-			{   "Delay Time 3",  Parameter::ROTARY, 0.001, 0.1, 0.075, AUTO_SIZE  },
-            {   "Feedback Gain",  Parameter::ROTARY, 0.0, 0.25, 0.125, AUTO_SIZE  },
-            {   "Mix",  Parameter::ROTARY, 0.0, 100.0, 25.0, AUTO_SIZE  },
-            {   "Output Gain",  Parameter::SLIDER, 0.0, 1.0, 0.5, AUTO_SIZE  },
+            {   "Input Gain",  Parameter::SLIDER, 0.0f, 1.0f, 0.5f, AUTO_SIZE  },
+
+            {   "Delay Time 1",  Parameter::ROTARY, 0.001f, 0.1f, 0.025f, AUTO_SIZE  },
+			{   "Delay Time 2",  Parameter::ROTARY, 0.001f, 0.1f, 0.05f, AUTO_SIZE  },
+			{   "Delay Time 3",  Parameter::ROTARY, 0.001f, 0.1f, 0.075f, AUTO_SIZE  },
+
+            {   "Feedback Gain",  Parameter::ROTARY, 0.0f, 0.25f, 0.125f, AUTO_SIZE  },
+
+			{	"LPF Cutoff",  Parameter::ROTARY, 0.0f, 1.0f, 0.5f, AUTO_SIZE },
+
+            {   "Mix",  Parameter::ROTARY, 0.0f, 100.0f, 25.0f, AUTO_SIZE  },
+            {   "Output Gain",  Parameter::SLIDER, 0.0f, 1.0f, 0.5f, AUTO_SIZE  },
         };
 
         const Presets PRESETS = {
@@ -93,15 +98,19 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 	float *pfOutBuffer[2] = { outputBuffers[0], outputBuffers[1] };
 
 	float fInputGain = pow(parameters[0], 3.0f);
+
 	float fDelayTimes[3] = { parameters[1] * 10.0f, parameters[2] * 10.0f, parameters[3] * 10.0f };
 	float fFeedbackGain = parameters[4];
-	float fMix = parameters[5] / 100.0f; // Convert from 0-100 to 0-1
-	float fOutputGain = parameters[6];
+
+	float fLpfCutoff = (50.0f + (pow(parameters[5], 3.0f) * (5000.0f - 50.0f))) / getSampleRate();
+
+	float fMix = parameters[6] / 100.0f; // Convert from 0-100 to 0-1
+	float fOutputGain = parameters[7];
 
 	// Set delay parameters for all channels
 	for (int ch = 0; ch < 2; ch++)
 	{
-		del[ch].setDelayTimes(fDelayTimes, fFeedbackGain);
+		del[ch].setDelayTimes(fDelayTimes, fFeedbackGain, fLpfCutoff);
 	}
 
 	while (numSamples--)

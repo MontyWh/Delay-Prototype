@@ -111,6 +111,7 @@
     <ClCompile Include="src\EffectPlugin.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include=".github\copilot-instructions.md" />
     <None Include="include\stk\SKINI.msg" />
     <None Include="include\stk\SKINI.tbl" />
   </ItemGroup>
