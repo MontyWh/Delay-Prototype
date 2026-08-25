@@ -31,7 +31,8 @@ public:
 private:
 	// Declare shared member variables here
 
-	MyDelay del[2];
+	myMultiLineDelay del[2];
+	MyFilters::MyIirFilter::MyBiQuadFilter::MyLowPassFilter LPF[2];
 
 	float fSampleRate;
 };
