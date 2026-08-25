@@ -6,7 +6,29 @@
 //
 
 
-class MyIirFilter
+class MyFilterGainProcessor // Filter / shelf hybrid splitter - gain processor class
+{
+public:
+	float filterShelfHybridSplitter(float input, float filtered, float gain)
+	{
+		// Calculate blend factor ONCE, before using it on each sample
+		float fBlend;
+		if (gain < 3.0f)
+		{
+			// 0.0 = full filter, 3.0 = unchanged (0 dB)
+			fBlend = gain / 3.0f;
+			return filtered * (1.0f - fBlend) + (input * fBlend);
+		}
+		else
+		{
+			// 3.0 = unchanged (0 dB), 6.0 = full shelf boost
+			fBlend = (gain - 3.0f) / 3.0f;
+			return input + (filtered * fBlend);
+		}
+	}
+};
+
+class MyIirFilter // A namespace for your Infinite Impulse Response (IIR) filter classes
 {
 public:
 

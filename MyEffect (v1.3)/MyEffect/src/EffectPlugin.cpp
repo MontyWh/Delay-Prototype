@@ -134,61 +134,19 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 			if (fBpfOnOff < 0.5f)
 			{
 				float fFiltered = BPF[ch].process(fWet);
-
-				// Calculate blend factor ONCE, before using it on each sample
-				float fBlend;
-				if (fBpfGain < 3.0f)
-				{
-					// 0.0 = full filter, 3.0 = unchanged (0 dB)
-					fBlend = fBpfGain / 3.0f;
-					fWet = fFiltered * (1.0f - fBlend) + (fWet * fBlend);
-				}
-				else
-				{
-					// 3.0 = unchanged (0 dB), 6.0 = full shelf boost
-					fBlend = (fBpfGain - 3.0f) / 3.0f;
-					fWet = fWet + (fFiltered * fBlend);
-				}
+				fWet = FilterGain.filterShelfHybridSplitter(fWet, fFiltered, fBpfGain);
 			}
 
 			if (fLpfOnOff < 0.5f)
 			{
 				float fFiltered = LPF[ch].process(fWet);
-
-				// Calculate blend factor ONCE, before using it on each sample
-				float fBlend;
-				if (fLpfGain < 3.0f)
-				{
-					// 0.0 = full filter, 3.0 = unchanged (0 dB)
-					fBlend = fLpfGain / 3.0f;
-					fWet = fFiltered * (1.0f - fBlend) + (fWet * fBlend);
-				}
-				else
-				{
-					// 3.0 = unchanged (0 dB), 6.0 = full shelf boost
-					fBlend = (fLpfGain - 3.0f) / 3.0f;
-					fWet = fWet + (fFiltered * fBlend);
-				}
+				fWet = FilterGain.filterShelfHybridSplitter(fWet, fFiltered, fLpfGain);
 			}
 
 			if (fHpfOnOff < 0.5f)
 			{
 				float fFiltered = HPF[ch].process(fWet);
-
-				// Calculate blend factor ONCE, before using it on each sample
-				float fBlend;
-				if (fHpfGain < 3.0f)
-				{
-					// 0.0 = full filter, 3.0 = unchanged (0 dB)
-					fBlend = fHpfGain / 3.0f;
-					fWet = fFiltered * (1.0f - fBlend) + (fWet * fBlend);
-				}
-				else
-				{
-					// 3.0 = unchanged (0 dB), 6.0 = full shelf boost
-					fBlend = (fHpfGain - 3.0f) / 3.0f;
-					fWet = fWet + (fFiltered * fBlend);
-				}
+				fWet = FilterGain.filterShelfHybridSplitter(fWet, fFiltered, fHpfGain);
 			}
 
 			fOut[ch] = fWet * fOutGain;

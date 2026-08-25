@@ -9,6 +9,7 @@
 - User prefers code changes to stay in their existing style, format, and language, with subtle incremental fixes rather than stylistic rewrites.
 - User prefers avoiding redundant defensive clamps when API-level parameter bounds already guarantee valid ranges, considering such checks unnecessary noise.
 - User wants existing shelving -> normal -> filter behavior and On/Off semantics preserved when making routing/topology changes.
+- User prefers encapsulation refactors to preserve existing code/comment style, format, spelling, and language with no behavior changes.
 
 ## Debugging Guidelines
 - When debugging this plugin, focus root-cause analysis on the DSP/filter implementation rather than assuming APDI parameter initialization is the problem without stronger evidence.

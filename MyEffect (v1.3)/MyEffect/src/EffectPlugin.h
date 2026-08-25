@@ -34,4 +34,5 @@ private:
 	MyIirFilter::MyBiQuadFilter::MyLowPassFilter  LPF[2]; // Stereo lowpass filter  (2 channels)
 	MyIirFilter::MyBiQuadFilter::MyBandPassFilter BPF[2]; // Stereo bandpass filter (2 channels)
 	MyIirFilter::MyBiQuadFilter::MyHighPassFilter HPF[2]; // Stereo highpass filter (2 channels)
+	MyFilterGainProcessor FilterGain;
 };
