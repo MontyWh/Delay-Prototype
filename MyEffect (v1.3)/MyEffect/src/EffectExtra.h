@@ -7,111 +7,6 @@
 
 #pragma once
 
-class myMultiLineDelay
-{
-public:
-	myMultiLineDelay()
-	{
-		fFeedbackGain = 0.0f;
-	}
-
-	void setDelayTimes(float* delayTimes, float feedbackGain, float lpfCutoff)
-	{
-		for (int d = 0; d < 3; d++) delays[d].setDelayTime(delayTimes[d]);
-		fFeedbackGain = feedbackGain;
-
-		LPF.set(lpfCutoff);
-	}
-
-	void initialiseBuffer(float sampleRate)
-	{
-		for (int d = 0; d < 3; d++) delays[d].initialiseBuffer(sampleRate);
-	}
-
-	float process(float input, float sampleRate)
-	{
-		float fSummedTaps = 0.0f;
-		for (int d = 0; d < 3; d++) fSummedTaps += delays[d].read(sampleRate);
-
-		float fWriteValue = input + LPF.process(fSummedTaps * fFeedbackGain);
-		for (int d = 0; d < 3; d++) delays[d].write(fWriteValue);
-
-		return input + fSummedTaps;
-	}
-
-	void postProcess()
-	{
-		for (int d = 0; d < 3; d++) delays[d].postProcess();
-	}
-
-private:
-	class MyDelay
-	{
-	public:
-		MyDelay()
-		{
-			pfCircularBuffer = nullptr;
-
-			iBufferSize = 0;
-			iBufferWritePos = 0;
-
-			fDelayTime = 0.0f;
-		}
-
-		~MyDelay()
-		{
-			delete[] pfCircularBuffer;
-		}
-
-		void setDelayTime(float delayTime)
-		{
-			fDelayTime = delayTime;
-		}
-
-		void initialiseBuffer(float sampleRate)
-		{
-			iBufferSize = sampleRate * 2; // 2 seconds of audio
-
-			delete[] pfCircularBuffer;
-			pfCircularBuffer = new float[iBufferSize]; // Allocate memory for the circular buffer
-
-			for (int i = 0; i < iBufferSize; i++) pfCircularBuffer[i] = 0.0f; // Initialise the circular buffer to zero
-
-			iBufferWritePos = 0; // Reset the write position to the start of the buffer
-		}
-
-		float read(float sampleRate)
-		{
-			int readPos = iBufferWritePos - (int)(sampleRate * fDelayTime);
-			if (readPos < 0) readPos += iBufferSize;
-
-			return pfCircularBuffer[readPos];
-		}
-
-		void write(float input)
-		{
-			pfCircularBuffer[iBufferWritePos] = input;
-		}
-
-		void postProcess()
-		{
-			iBufferWritePos++; // Increment the write position
-			if (iBufferWritePos >= iBufferSize) iBufferWritePos = 0; // Wrap around if necessary
-		}
-
-	private:
-		float fDelayTime;
-		float* pfCircularBuffer;
-		int iBufferSize, iBufferWritePos;
-	};
-
-	MyDelay delays[3];
-	float fFeedbackGain;
-
-	MyFilters::MyIirFilter::MyBiQuadFilter::MyLowPassFilter LPF;
-};
-
-
 class MyFilters
 {
 public:
@@ -297,5 +192,150 @@ public:
 				bool bCutoffInitialised = false;
 			};
 		};
+	};
+};
+
+class MyEcho
+{
+public:
+	class MyMultiLineDelay
+	{
+	public:
+
+		int numberOfDelays;
+
+		MyMultiLineDelay()
+		{
+			fFeedbackGain = 0.0f;
+		}
+
+		void set(float* delayTimes, float feedbackGain, float lpfCutoff, int numDelays)
+		{
+			numberOfDelays = numDelays;
+
+			for (int i = 0; i < numDelays; i++) MultipleDelays[i].set(delayTimes[i]);
+			fFeedbackGain = feedbackGain;
+
+			LPF.set(lpfCutoff);
+		}
+
+		void initialiseBuffer(float sampleRate)
+		{
+			for (int d = 0; d < 3; d++) MultipleDelays[d].initialiseBuffer(sampleRate);
+		}
+
+		float process(float input, float sampleRate)
+		{
+			float fSummedTaps = 0.0f;
+			for (int i = 0; i < numberOfDelays; i++) fSummedTaps += MultipleDelays[i].read(sampleRate);
+
+			float fWriteValue = input + LPF.process(fSummedTaps * fFeedbackGain);
+			for (int i = 0; i < numberOfDelays; i++) MultipleDelays[i].write(fWriteValue);
+
+			return input + fSummedTaps;
+		}
+
+		void postProcess()
+		{
+			for (int i = 0; i < numberOfDelays; i++) MultipleDelays[i].postProcess();
+		}
+
+		class MyDelay
+		{
+		public:
+
+			MyDelay()
+			{
+				pfCircularBuffer = nullptr;
+
+				iBufferSize = 0;
+				iBufferWritePos = 0;
+
+				fDelayTime = 0.0f;
+			}
+
+			~MyDelay()
+			{
+				delete[] pfCircularBuffer;
+			}
+
+			void set(float delayTime)
+			{
+				fDelayTime = delayTime;
+			}
+
+			void initialiseBuffer(float sampleRate)
+			{
+				iBufferSize = sampleRate * 2; // 2 seconds of audio
+
+				delete[] pfCircularBuffer;
+				pfCircularBuffer = new float[iBufferSize]; // Allocate memory for the circular buffer
+
+				for (int i = 0; i < iBufferSize; i++) pfCircularBuffer[i] = 0.0f; // Initialise the circular buffer to zero
+
+				iBufferWritePos = 0; // Reset the write position to the start of the buffer
+			}
+
+			float read(float sampleRate)
+			{
+				int readPos = iBufferWritePos - (int)(sampleRate * fDelayTime);
+				if (readPos < 0) readPos += iBufferSize;
+
+				return pfCircularBuffer[readPos];
+			}
+
+			void write(float input)
+			{
+				pfCircularBuffer[iBufferWritePos] = input;
+			}
+
+			void postProcess()
+			{
+				iBufferWritePos++; // Increment the write position
+				if (iBufferWritePos >= iBufferSize) iBufferWritePos = 0; // Wrap around if necessary
+			}
+
+			int iBufferWritePos;
+			int iBufferSize;
+
+		private:
+			float fDelayTime;
+			float* pfCircularBuffer;
+		};
+
+		MyDelay MultipleDelays[3];
+
+	private:
+		float fFeedbackGain;
+
+		MyFilters::MyIirFilter::MyBiQuadFilter::MyLowPassFilter LPF;
+	};
+
+	class MyReverb
+	{
+	public:
+		void set(float* delayTimes, float feedbackGain, float lpfCutoff, int numDelays)
+		{
+			Delay.set(delayTimes, feedbackGain, lpfCutoff, numDelays);
+		}
+
+		void postProcess()
+		{
+			Delay.postProcess();
+		}
+
+	private:
+		int tapPos(float time, float sampleRate)
+		{
+			for (int i = 0; i < Delay.numberOfDelays; i++)
+			{
+				int iBufferReadPos = Delay.MultipleDelays[i].iBufferWritePos - (time * sampleRate);
+				if (iBufferReadPos < 0) iBufferReadPos += Delay.MultipleDelays[i].iBufferSize;
+
+				return iBufferReadPos;
+			}
+		}
+
+		MyMultiLineDelay Delay;
 	};
 };

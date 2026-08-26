@@ -33,7 +33,8 @@ public:
 private:
 	// Declare shared member variables here
 
-	myMultiLineDelay del[2];
+	MyEcho::MyMultiLineDelay Delay[2];
+	MyEcho::MyReverb Reverb[2];
 
 	float fSampleRate;
 };

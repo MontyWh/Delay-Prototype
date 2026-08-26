@@ -29,9 +29,10 @@ extern "C" {
         
         const Parameters CONTROLS = {
             //  name,       type,              min, max, initial, size
-            {   "Input Gain",  Parameter::SLIDER, 0.0f, 1.0f, 0.5f, AUTO_SIZE  },
+            {   "Input Gain",  Parameter::SLIDER, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
 
-            {   "Delay Time 1",  Parameter::ROTARY, 0.001f, 0.1f, 0.025f, AUTO_SIZE  },
+			{   "Number of Delays",  Parameter::ROTARY, 1, 3, 1, AUTO_SIZE  },
+			{   "Delay Time 1",  Parameter::ROTARY, 0.001f, 0.1f, 0.025f, AUTO_SIZE  },
 			{   "Delay Time 2",  Parameter::ROTARY, 0.001f, 0.1f, 0.05f, AUTO_SIZE  },
 			{   "Delay Time 3",  Parameter::ROTARY, 0.001f, 0.1f, 0.075f, AUTO_SIZE  },
 
@@ -39,8 +40,8 @@ extern "C" {
 
 			{	"LPF Cutoff",  Parameter::ROTARY, 0.0f, 1.0f, 0.5f, AUTO_SIZE },
 
-            {   "Mix",  Parameter::ROTARY, 0.0f, 100.0f, 25.0f, AUTO_SIZE  },
-            {   "Output Gain",  Parameter::SLIDER, 0.0f, 1.0f, 0.5f, AUTO_SIZE  },
+            {   "Mix",  Parameter::ROTARY, 0.0f, 100.0f, 50.0f, AUTO_SIZE  },
+            {   "Output Gain",  Parameter::SLIDER, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
         };
 
         const Presets PRESETS = {
@@ -61,7 +62,7 @@ MyEffect::MyEffect(const Parameters& parameters, const Presets& presets)
 	fSampleRate = getSampleRate();
 	for (int ch = 0; ch < 2; ch++)
 	{
-		del[ch].initialiseBuffer(fSampleRate);
+		Delay[ch].initialiseBuffer(fSampleRate);
 	}
 }
 
@@ -99,18 +100,21 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 	float fInputGain = pow(parameters[0], 3.0f);
 
-	float fDelayTimes[3] = { parameters[1] * 10.0f, parameters[2] * 10.0f, parameters[3] * 10.0f };
-	float fFeedbackGain = parameters[4];
+	int iNumberOfDelays = parameters[1];
+	float fDelayTimes[3] = { parameters[2] * 10.0f, parameters[3] * 10.0f, parameters[4] * 10.0f };
+	float fFeedbackGain = parameters[5];
 
-	float fLpfCutoff = (50.0f + (pow(parameters[5], 3.0f) * (5000.0f - 50.0f))) / getSampleRate();
+	float fLpfCutoff = (50.0f + (pow(parameters[6], 3.0f) * (5000.0f - 50.0f))) / getSampleRate();
 
-	float fMix = parameters[6] / 100.0f; // Convert from 0-100 to 0-1
-	float fOutputGain = parameters[7];
+	float fMix = parameters[7] / 100.0f; // Convert from 0-100 to 0-1
+	float fOutputGain = parameters[8];
 
 	// Set delay parameters for all channels
 	for (int ch = 0; ch < 2; ch++)
 	{
-		del[ch].setDelayTimes(fDelayTimes, fFeedbackGain, fLpfCutoff);
+		//Delay[ch].set(fDelayTimes, fFeedbackGain, fLpfCutoff, iNumberOfDelays);
+		
+		Reverb[ch].set(fDelayTimes, fFeedbackGain, fLpfCutoff, iNumberOfDelays);
 	}
 
 	while (numSamples--)
@@ -122,7 +126,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 			fIn[ch] *= fInputGain; // Apply input gain
 
 			// Process: sum 3 taps before feedback
-			fWet[ch] = del[ch].process(fIn[ch], fSampleRate);
+			fWet[ch] = Delay[ch].process(fIn[ch], fSampleRate);
 
 			fOut[ch] = fWet[ch] * fMix + fIn[ch] * (1.0f - fMix); // Apply mix
 			fOut[ch] *= fOutputGain; // Apply output gain
@@ -130,7 +134,9 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 			// Copy result to output
 			*pfOutBuffer[ch]++ = fOut[ch];
 
-			del[ch].postProcess();
+			//Delay[ch].postProcess();
+
+			Reverb[ch].postProcess();
 		}
 	}
 }
