@@ -319,22 +319,19 @@ public:
 			Delay.set(delayTimes, feedbackGain, lpfCutoff, numDelays);
 		}
 
-		void postProcess()
+		/*void postProcess()
 		{
 			Delay.postProcess();
+		}*/
+
+		int tapPos(int delayIndex, float time, float sampleRate)
+		{
+			int iBufferReadPos = Delay.MultipleDelays[delayIndex].iBufferWritePos - (time * sampleRate);
+			if (iBufferReadPos < 0) iBufferReadPos += Delay.MultipleDelays[delayIndex].iBufferSize;
+			return iBufferReadPos;
 		}
 
 	private:
-		int tapPos(float time, float sampleRate)
-		{
-			for (int i = 0; i < Delay.numberOfDelays; i++)
-			{
-				int iBufferReadPos = Delay.MultipleDelays[i].iBufferWritePos - (time * sampleRate);
-				if (iBufferReadPos < 0) iBufferReadPos += Delay.MultipleDelays[i].iBufferSize;
-
-				return iBufferReadPos;
-			}
-		}
 
 		MyMultiLineDelay Delay;
 	};

@@ -135,8 +135,9 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 			*pfOutBuffer[ch]++ = fOut[ch];
 
 			//Delay[ch].postProcess();
+			//Reverb[ch].postProcess();
 
-			Reverb[ch].postProcess();
+			for (int i = 0; i < 3; i++) Reverb[ch].tapPos(i, fDelayTimes[i], fSampleRate);
 		}
 	}
 }
