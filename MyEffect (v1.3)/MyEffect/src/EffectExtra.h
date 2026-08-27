@@ -202,18 +202,14 @@ public:
 	{
 	public:
 
-		int iNumberOfDelays = 0;
-
 		MyMultiLineDelay()
 		{
 			fFeedbackGain = 0.0f;
 		}
 
-		void set(float delayTimes[3], float feedbackGain, float lpfCutoff, int numDelays)
+		void set(float delayTime, float feedbackGain, float lpfCutoff)
 		{
-			iNumberOfDelays = numDelays;
-
-			for (int i = 0; i < numDelays; i++) MultipleDelays[i].set(delayTimes[i]);
+			Delay.set(delayTime);
 			fFeedbackGain = feedbackGain;
 
 			LPF.set(lpfCutoff);
@@ -221,23 +217,21 @@ public:
 
 		void initialiseBuffer(float sampleRate)
 		{
-			for (int d = 0; d < 3; d++) MultipleDelays[d].initialiseBuffer(sampleRate);
+			Delay.initialiseBuffer(sampleRate);
 		}
 
 		float process(float input, float sampleRate)
 		{
-			float fSummedTaps = 0.0f;
-			for (int i = 0; i < iNumberOfDelays; i++) fSummedTaps += MultipleDelays[i].read(sampleRate);
+			float fTap = Delay.read(sampleRate);
+			float fWriteValue = input + LPF.process(fTap * fFeedbackGain);
+			Delay.write(fWriteValue);
 
-			float fWriteValue = input + LPF.process(fSummedTaps * fFeedbackGain);
-			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].write(fWriteValue);
-
-			return fSummedTaps;
+			return fTap;
 		}
 
 		void postProcess()
 		{
-			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].postProcess();
+			Delay.postProcess();
 		}
 
 		class MyDelay
@@ -345,7 +339,7 @@ public:
 			float* pfCircularBuffer;
 		};
 
-		MyDelay MultipleDelays[3];
+		MyDelay Delay;
 
 	private:
 		float fFeedbackGain;
@@ -358,35 +352,43 @@ public:
 	public:
 		void initialiseBuffer(float sampleRate)
 		{
-			Delay.initialiseBuffer(sampleRate);
+			for (int i = 0; i < 3; i++)
+				for (int j = 0; j < 4; j++) Delays[i][j].initialiseBuffer(sampleRate);
 		}
 
-		void set(float* delayTimes, float feedbackGain, float lpfCutoff, int numDelays)
+		void set(float delayTimes[3][4], float feedbackGain, float lpfCutoff, int numDelays)
 		{
-			Delay.set(delayTimes, feedbackGain, lpfCutoff, numDelays);
+			iNumberOfDelayGroups = numDelays;
+			for (int i = 0; i < iNumberOfDelayGroups; i++)
+				for (int j = 0; j < 4; j++) Delays[i][j].set(delayTimes[i][j], feedbackGain, lpfCutoff);
 		}
 
 		int tapPos(int delayIndex, float time, float sampleRate)
 		{
-			int iBufferReadPos = Delay.MultipleDelays[delayIndex].iBufferWritePos - (time * sampleRate);
-			if (iBufferReadPos < 0) iBufferReadPos += Delay.MultipleDelays[delayIndex].iBufferSize;
+			int i = delayIndex / 4;
+			int j = delayIndex % 4;
+			int iBufferReadPos = Delays[i][j].Delay.iBufferWritePos - (time * sampleRate);
+			if (iBufferReadPos < 0) iBufferReadPos += Delays[i][j].Delay.iBufferSize;
 			return iBufferReadPos;
 		}
 
 		float process(float input, float sampleRate)
 		{
-			return Delay.process(input, sampleRate);
+			float fSummedTaps = 0.0f;
+			for (int i = 0; i < iNumberOfDelayGroups; i++)
+				for (int j = 0; j < 4; j++) fSummedTaps += Delays[i][j].process(input, sampleRate);
+			return fSummedTaps;
 		}
 
 		void postProcess()
 		{
-			Delay.postProcess();
+			for (int i = 0; i < iNumberOfDelayGroups; i++)
+				for (int j = 0; j < 4; j++) Delays[i][j].postProcess();
 		}
 
-		MyMultiLineDelay Delay;
+		MyMultiLineDelay Delays[3][4];
 
 	private:
-
-		
+		int iNumberOfDelayGroups = 0;
 	};
 };
