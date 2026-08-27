@@ -202,16 +202,16 @@ public:
 	{
 	public:
 
-		int numberOfDelays;
+		int iNumberOfDelays = 0;
 
 		MyMultiLineDelay()
 		{
 			fFeedbackGain = 0.0f;
 		}
 
-		void set(float* delayTimes, float feedbackGain, float lpfCutoff, int numDelays)
+		void set(float delayTimes[3], float feedbackGain, float lpfCutoff, int numDelays)
 		{
-			numberOfDelays = numDelays;
+			iNumberOfDelays = numDelays;
 
 			for (int i = 0; i < numDelays; i++) MultipleDelays[i].set(delayTimes[i]);
 			fFeedbackGain = feedbackGain;
@@ -227,17 +227,17 @@ public:
 		float process(float input, float sampleRate)
 		{
 			float fSummedTaps = 0.0f;
-			for (int i = 0; i < numberOfDelays; i++) fSummedTaps += MultipleDelays[i].read(sampleRate);
+			for (int i = 0; i < iNumberOfDelays; i++) fSummedTaps += MultipleDelays[i].read(sampleRate);
 
 			float fWriteValue = input + LPF.process(fSummedTaps * fFeedbackGain);
-			for (int i = 0; i < numberOfDelays; i++) MultipleDelays[i].write(fWriteValue);
+			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].write(fWriteValue);
 
-			return input + fSummedTaps;
+			return fSummedTaps;
 		}
 
 		void postProcess()
 		{
-			for (int i = 0; i < numberOfDelays; i++) MultipleDelays[i].postProcess();
+			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].postProcess();
 		}
 
 		class MyDelay
@@ -274,6 +274,48 @@ public:
 				for (int i = 0; i < iBufferSize; i++) pfCircularBuffer[i] = 0.0f; // Initialise the circular buffer to zero
 
 				iBufferWritePos = 0; // Reset the write position to the start of the buffer
+			}
+
+			static void quantiseToMusicalValues(float& delayTime, bool bQuantise = true) // Quantise delay times to nearest musical duration
+			{
+				if (!bQuantise) return;
+
+				// Musical timing values in current parameter range (whole note = 0.1f)
+				const float fMusicalValues[] = {
+					0.00625f,    // 1/16
+					0.008333333f,// 1/8 triplet / swing short
+					0.0125f,     // 1/8
+					0.016666667f,// 1/4 triplet / swing long
+					0.01875f,    // dotted 1/8
+					0.025f,      // 1/4
+					0.033333333f,// 1/2 triplet
+					0.0375f,     // dotted 1/4
+					0.05f,       // 1/2
+					0.066666667f,// whole triplet
+					0.075f,      // dotted 1/2
+					0.1f         // whole
+				};
+				const int iNumValues = sizeof(fMusicalValues) / sizeof(fMusicalValues[0]);
+
+				auto quantiseSingle = [&](float& delayTime)
+					{
+						float fNearest = fMusicalValues[0];
+						float fSmallestDiff = delayTime > fNearest ? delayTime - fNearest : fNearest - delayTime;
+
+						for (int i = 1; i < iNumValues; i++)
+						{
+							float fCurrentDiff = delayTime > fMusicalValues[i] ? delayTime - fMusicalValues[i] : fMusicalValues[i] - delayTime;
+							if (fCurrentDiff < fSmallestDiff)
+							{
+								fSmallestDiff = fCurrentDiff;
+								fNearest = fMusicalValues[i];
+							}
+						}
+
+						delayTime = fNearest;
+					};
+
+				quantiseSingle(delayTime);
 			}
 
 			float read(float sampleRate)
@@ -314,15 +356,15 @@ public:
 	class MyReverb
 	{
 	public:
+		void initialiseBuffer(float sampleRate)
+		{
+			Delay.initialiseBuffer(sampleRate);
+		}
+
 		void set(float* delayTimes, float feedbackGain, float lpfCutoff, int numDelays)
 		{
 			Delay.set(delayTimes, feedbackGain, lpfCutoff, numDelays);
 		}
-
-		/*void postProcess()
-		{
-			Delay.postProcess();
-		}*/
 
 		int tapPos(int delayIndex, float time, float sampleRate)
 		{
@@ -331,8 +373,20 @@ public:
 			return iBufferReadPos;
 		}
 
-	private:
+		float process(float input, float sampleRate)
+		{
+			return Delay.process(input, sampleRate);
+		}
+
+		void postProcess()
+		{
+			Delay.postProcess();
+		}
 
 		MyMultiLineDelay Delay;
+
+	private:
+
+		
 	};
 };

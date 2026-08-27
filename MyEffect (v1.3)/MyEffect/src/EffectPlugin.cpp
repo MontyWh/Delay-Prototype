@@ -27,18 +27,18 @@ extern "C" {
         // - by default, the controls are laid out in a grid, but you can also move and size them manually
         //   i.e. replace AUTO_SIZE with { 50,50,100,100 } to place a 100x100 control at (50,50)
         
-        const Parameters CONTROLS = {
-            //  name,       type,              min, max, initial, size
-            {   "Input Gain",  Parameter::SLIDER, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
+		const Parameters CONTROLS = {
+			//  name,       type,              min, max, initial, size
+			{   "Input Gain",  Parameter::SLIDER, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
 
-			{   "Number of Delays",  Parameter::ROTARY, 1, 3, 1, AUTO_SIZE  },
+			{   "Number of Delays",  Parameter::MENU, { "1 Delay Line", "2 Delay Lines", "3 Delay Lines" }, AUTO_SIZE  },
 			{   "Delay Time 1",  Parameter::ROTARY, 0.001f, 0.1f, 0.025f, AUTO_SIZE  },
 			{   "Delay Time 2",  Parameter::ROTARY, 0.001f, 0.1f, 0.05f, AUTO_SIZE  },
 			{   "Delay Time 3",  Parameter::ROTARY, 0.001f, 0.1f, 0.075f, AUTO_SIZE  },
 
             {   "Feedback Gain",  Parameter::ROTARY, 0.0f, 0.25f, 0.125f, AUTO_SIZE  },
 
-			{	"LPF Cutoff",  Parameter::ROTARY, 0.0f, 1.0f, 0.5f, AUTO_SIZE },
+			{	"LPF Cutoff",  Parameter::ROTARY, 0.0f, 1.0f, 0.0f, AUTO_SIZE },
 
             {   "Mix",  Parameter::ROTARY, 0.0f, 100.0f, 50.0f, AUTO_SIZE  },
             {   "Output Gain",  Parameter::SLIDER, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
@@ -62,7 +62,8 @@ MyEffect::MyEffect(const Parameters& parameters, const Presets& presets)
 	fSampleRate = getSampleRate();
 	for (int ch = 0; ch < 2; ch++)
 	{
-		Delay[ch].initialiseBuffer(fSampleRate);
+		//Delay[ch].initialiseBuffer(fSampleRate);
+		Reverb[ch].initialiseBuffer(fSampleRate);
 	}
 }
 
@@ -94,13 +95,19 @@ void MyEffect::buttonPressed(int iButton)
 // (inputBuffer contains the input audio, and processed samples should be stored in outputBuffer)
 void MyEffect::process(const float** inputBuffers, float** outputBuffers, int numSamples)
 {
-	float fWet[2], fIn[2], fOut[2] = { 0, 0, };
+	float fIn[2], fOut[2] = { 0, 0, };
 	const float* pfInBuffer[2] = { inputBuffers[0], inputBuffers[1] };
 	float *pfOutBuffer[2] = { outputBuffers[0], outputBuffers[1] };
 
 	float fInputGain = pow(parameters[0], 3.0f);
 
-	int iNumberOfDelays = parameters[1];
+	int iNumberOfDelays = parameters[1] + 1;  // MENU exports 0, 1, 2 but we need 1, 2, 3
+
+	//for (int i = 0; i < 3; i++)
+	//Delay[i].quantiseToMusicalValues(parameters[2]);
+	//Delay[i].quantiseToMusicalValues(parameters[3]);
+	//Delay[i].quantiseToMusicalValues(parameters[4]);
+
 	float fDelayTimes[3] = { parameters[2] * 10.0f, parameters[3] * 10.0f, parameters[4] * 10.0f };
 	float fFeedbackGain = parameters[5];
 
@@ -126,18 +133,18 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 			fIn[ch] *= fInputGain; // Apply input gain
 
 			// Process: sum 3 taps before feedback
-			fWet[ch] = Delay[ch].process(fIn[ch], fSampleRate);
+			float fWet = Reverb[ch].process(fIn[ch], fSampleRate);
 
-			fOut[ch] = fWet[ch] * fMix + fIn[ch] * (1.0f - fMix); // Apply mix
+			for (int i = 0; i < 3; i++) Reverb[ch].tapPos(i, fDelayTimes[i], fSampleRate);
+
+			fOut[ch] = fWet * fMix + fIn[ch] * (1.0f - fMix); // Apply mix
 			fOut[ch] *= fOutputGain; // Apply output gain
 
 			// Copy result to output
 			*pfOutBuffer[ch]++ = fOut[ch];
 
 			//Delay[ch].postProcess();
-			//Reverb[ch].postProcess();
-
-			for (int i = 0; i < 3; i++) Reverb[ch].tapPos(i, fDelayTimes[i], fSampleRate);
+			Reverb[ch].postProcess();
 		}
 	}
 }
