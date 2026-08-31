@@ -205,11 +205,25 @@ public:
 		MyMultiLineDelay()
 		{
 			fFeedbackGain = 0.0f;
+			iNumberOfDelays = 1;
+			bUseMultipleDelayLines = false;
 		}
 
 		void set(float delayTime, float feedbackGain, float lpfCutoff)
 		{
 			Delay.set(delayTime);
+			fFeedbackGain = feedbackGain;
+			iNumberOfDelays = 1;
+			bUseMultipleDelayLines = false;
+
+			LPF.set(lpfCutoff);
+		}
+
+		void set(float *delayTimes, float feedbackGain, float lpfCutoff, int numDelays)
+		{
+			iNumberOfDelays = numDelays;
+			bUseMultipleDelayLines = true;
+			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].set(delayTimes[i]);
 			fFeedbackGain = feedbackGain;
 
 			LPF.set(lpfCutoff);
@@ -218,10 +232,22 @@ public:
 		void initialiseBuffer(float sampleRate)
 		{
 			Delay.initialiseBuffer(sampleRate);
+			for (int i = 0; i < 3; i++) MultipleDelays[i].initialiseBuffer(sampleRate);
 		}
 
 		float process(float input, float sampleRate)
 		{
+			if (bUseMultipleDelayLines)
+			{
+				float fSummedTaps = 0.0f;
+				for (int i = 0; i < iNumberOfDelays; i++) fSummedTaps += MultipleDelays[i].read(sampleRate);
+
+				float fWriteValue = input + LPF.process(fSummedTaps * fFeedbackGain);
+				for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].write(fWriteValue);
+
+				return fSummedTaps;
+			}
+
 			float fTap = Delay.read(sampleRate);
 			float fWriteValue = input + LPF.process(fTap * fFeedbackGain);
 			Delay.write(fWriteValue);
@@ -231,6 +257,12 @@ public:
 
 		void postProcess()
 		{
+			if (bUseMultipleDelayLines)
+			{
+				for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].postProcess();
+				return;
+			}
+
 			Delay.postProcess();
 		}
 
@@ -340,8 +372,11 @@ public:
 		};
 
 		MyDelay Delay;
+		MyDelay MultipleDelays[3];
 
 	private:
+		int iNumberOfDelays;
+		bool bUseMultipleDelayLines;
 		float fFeedbackGain;
 
 		MyFilters::MyIirFilter::MyBiQuadFilter::MyLowPassFilter LPF;

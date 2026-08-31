@@ -31,6 +31,8 @@ extern "C" {
 			//  name,       type,              min, max, initial, size
 			{   "Input Gain",  Parameter::SLIDER, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
 
+			{   "Bypass Delay",  Parameter::TOGGLE, 0, 1, 1, AUTO_SIZE  },
+			
 			{   "Number of Delays",  Parameter::MENU, { "1 Delay Line", "2 Delay Lines", "3 Delay Lines" }, AUTO_SIZE  },
 			{   "Delay Time 1",  Parameter::ROTARY, 0.001f, 0.1f, 0.025f, AUTO_SIZE  },
 			{   "Delay Time 2",  Parameter::ROTARY, 0.001f, 0.1f, 0.05f, AUTO_SIZE  },
@@ -40,6 +42,7 @@ extern "C" {
 
 			{	"LPF Cutoff",  Parameter::ROTARY, 0.0f, 1.0f, 0.0f, AUTO_SIZE },
 
+			{   "Bypass Reverb",  Parameter::TOGGLE, 0, 1, 0, AUTO_SIZE  },			
 			{   "Reverb Master Time",  Parameter::ROTARY, 0.01f, 0.4f, 0.4f, AUTO_SIZE  },
 
             {   "Mix",  Parameter::ROTARY, 0.0f, 100.0f, 50.0f, AUTO_SIZE  },
@@ -64,7 +67,7 @@ MyEffect::MyEffect(const Parameters& parameters, const Presets& presets)
 	fSampleRate = getSampleRate();
 	for (int ch = 0; ch < 2; ch++)
 	{
-		//Delay[ch].initialiseBuffer(fSampleRate);
+		Delay[ch].initialiseBuffer(fSampleRate);
 		Reverb[ch].initialiseBuffer(fSampleRate);
 	}
 }
@@ -103,19 +106,18 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 	float fInputGain = pow(parameters[0], 3.0f);
 
-	int iNumberOfDelays = parameters[1] + 1;  // MENU exports 0, 1, 2 but we need 1, 2, 3
+	int iBypassDelay = parameters[1];  // 0 = off, 1 = on
+	int iNumberOfDelays = parameters[2] + 1;  // MENU exports 0, 1, 2 but we need 1, 2, 3
 
-	//for (int i = 0; i < 3; i++)
-	//Delay[i].quantiseToMusicalValues(parameters[2]);
-	//Delay[i].quantiseToMusicalValues(parameters[3]);
-	//Delay[i].quantiseToMusicalValues(parameters[4]);
+	for (int i = 0; i < 3; i++) Delay[i].Delay.quantiseToMusicalValues(parameters[3 + i]);
 
-	//float fDelayEffectTimes[3] = { parameters[2] * 10.0f, parameters[3] * 10.0f, parameters[4] * 10.0f };
+	float fDelayEffectTimes[3] = { parameters[3] * 10.0f, parameters[4] * 10.0f, parameters[5] * 10.0f };
 
-	float fFeedbackGain = parameters[5];
+	float fFeedbackGain = parameters[6];
+	float fLpfCutoff = (50.0f + (pow(parameters[7], 3.0f) * (5000.0f - 50.0f))) / getSampleRate();
 
-	float fLpfCutoff = (50.0f + (pow(parameters[6], 3.0f) * (5000.0f - 50.0f))) / getSampleRate();
-
+	float iBypassReverb = parameters[8];  // 0 = off, 1 = on
+	
 	float fReverbPatterns[3][4];
 	float fReverbEffectTimes[4];
 	float fReverbEffectTimeCoeffs[3][4] = {
@@ -126,16 +128,16 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 	for (int i = 0; i < 3; i++)
 	{
-		for (int j = 0; j < 4; j++) fReverbEffectTimes[j] = fReverbPatterns[i][j] = parameters[7] * fReverbEffectTimeCoeffs[i][j];
+		for (int j = 0; j < 4; j++) fReverbEffectTimes[j] = fReverbPatterns[i][j] = parameters[9] * fReverbEffectTimeCoeffs[i][j];
 	}
 
-	float fMix = parameters[8] / 100.0f; // Convert from 0-100 to 0-1
-	float fOutputGain = parameters[9];
+	float fMix = parameters[10] / 100.0f; // Convert from 0-100 to 0-1
+	float fOutputGain = parameters[11];
 
 	// Set delay parameters for all channels
 	for (int ch = 0; ch < 2; ch++)
 	{
-		//Delay[ch].set(fDelayEffectTimes, fFeedbackGain, fLpfCutoff, iNumberOfDelays);		
+		Delay[ch].set(fDelayEffectTimes, fFeedbackGain, fLpfCutoff, iNumberOfDelays);		
 		Reverb[ch].set(fReverbPatterns, fFeedbackGain, fLpfCutoff, iNumberOfDelays);
 	}
 
@@ -148,7 +150,9 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 			fIn[ch] *= fInputGain; // Apply input gain
 
 			// Process: sum reverb taps before feedback
-			float fWet = Reverb[ch].process(fIn[ch], fSampleRate);
+			float fWet = fIn[ch];
+			if (iBypassDelay == 0) fWet = Delay[ch].process(fWet, fSampleRate);
+			if (iBypassReverb == 0) fWet = Reverb[ch].process(fWet, fSampleRate);
 
 			fOut[ch] = fWet * fMix + fIn[ch] * (1.0f - fMix); // Apply mix
 			fOut[ch] *= fOutputGain; // Apply output gain
@@ -156,7 +160,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 			// Copy result to output
 			*pfOutBuffer[ch]++ = fOut[ch];
 
-			//Delay[ch].postProcess();
+			Delay[ch].postProcess();
 			Reverb[ch].postProcess();
 		}
 	}
