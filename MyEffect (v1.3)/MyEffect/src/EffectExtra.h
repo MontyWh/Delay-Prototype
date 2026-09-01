@@ -7,6 +7,164 @@
 
 #pragma once
 
+class MyTremolo
+{
+public:
+	MyTremolo()
+	{
+
+	}
+
+	~MyTremolo()
+	{
+
+	}
+
+	void initialise(float sampleRate)
+	{
+		destroy();
+		fSampleRate = sampleRate;
+		iBufferSize = static_cast<int>(sampleRate * 2.0f);
+		if (iBufferSize < 1)
+			iBufferSize = 1;
+
+		pfCircularBuffer = new float[iBufferSize];
+		for (int i = 0; i < iBufferSize; ++i)
+			pfCircularBuffer[i] = 0.0f;
+
+		iBufferWritePos = 0;
+		iBufferReadPos = 0;
+		fDel = 0.0f;
+		fPhasePos = 0.0f;
+		fPhaseInc = 0.0f;
+	}
+
+	void setupValues(float rate)
+	{
+		if (fSampleRate <= 0.0f)
+			return;
+
+		fPhaseInc = (2.0f * static_cast<float>(M_PI) * rate) / fSampleRate;
+	}
+
+	void destroy()
+	{
+		delete[] pfCircularBuffer;
+		pfCircularBuffer = nullptr;
+		fSampleRate = 0.0f;
+		iBufferWritePos = 0;
+		iBufferReadPos = 0;
+		iBufferSize = 0;
+		fDel = 0.0f;
+		fPhasePos = 0.0f;
+		fPhaseInc = 0.0f;
+	}
+
+	float process(float input, float depth, float wet, float outputGain)
+	{
+		if (!pfCircularBuffer || iBufferSize <= 1) // Check if the circular buffer is valid
+			return input;
+
+		pfCircularBuffer[iBufferWritePos] = input;
+
+		const int iFixedDelSamples = static_cast<int>(0.25f * fSampleRate); // 0.25 seconds delay
+		iBufferReadPos = iBufferWritePos - iFixedDelSamples; // Read position is behind write position by fixed delay
+
+		while (iBufferReadPos < 0)
+			iBufferReadPos += iBufferSize;
+		while (iBufferReadPos >= iBufferSize)
+			iBufferReadPos -= iBufferSize;
+		fDel = pfCircularBuffer[iBufferReadPos];
+
+		const float fMod = std::sin(fPhasePos);
+		const float fOsc = ((fMod + 1.0f) * 0.5f) * depth;
+		const float fTremGain = (1.0f - depth) + fOsc;
+		const float fWet = input * fTremGain;
+
+		return ((1.0f - wet) * input + (wet * fWet)) * outputGain;
+	}
+
+	void postProcess()
+	{
+		if (!pfCircularBuffer || iBufferSize <= 1) // Check if the circular buffer is valid
+			return;
+
+		iBufferWritePos++;
+		if (iBufferWritePos >= iBufferSize)
+			iBufferWritePos = 0;
+
+		fPhasePos += fPhaseInc;
+		if (fPhasePos >= (M_PI * 2.0f))
+			fPhasePos -= (M_PI * 2.0f);
+	}
+
+	class WaveTypes
+	{
+	public:
+		// Waveform generation functions
+		// All functions output in range [-1, 1]
+		static float generateSine(float phase)
+		{
+			return std::sin(phase);
+		}
+
+		static float generateTriangle(float phase)
+		{
+			// Convert phase to triangle wave
+			const float fTwoPI = 2.0f * M_PI;
+			float fNormalised = phase / fTwoPI; // 0 to 1
+			if (fNormalised < 0.25f)
+				return fNormalised * 4.0f; // 0 to 1
+			else if (fNormalised < 0.75f)
+				return 1.0f - ((fNormalised - 0.25f) * 4.0f); // 1 to -1
+			else
+				return -1.0f + ((fNormalised - 0.75f) * 4.0f); // -1 to 0
+		}
+
+		static float generateSawtooth(float phase)
+		{
+			const float fTwoPI = 2.0f * M_PI;
+			return (phase / fTwoPI) * 2.0f - 1.0f;
+		}
+
+		static float generatePulse(float phase, float pulseWidth)
+		{
+			const float fTwoPI = 2.0f * M_PI;
+			float fNormalised = phase / fTwoPI; // 0 to 1
+			return (fNormalised < pulseWidth) ? 1.0f : -1.0f;
+		}
+
+		static float generateSquare(float phase)
+		{
+			return generatePulse(phase, 0.5f);
+		}
+
+		// Generate waveform based on type index (0-4)
+		static float generateWaveform(int waveType, float phase, float pulseWidth = 0.5f)
+		{
+			switch (waveType)
+			{
+			case 0: return generateSine(phase);
+			case 1: return generateTriangle(phase);
+			case 2: return generateSawtooth(phase);
+			case 3: return generatePulse(phase, pulseWidth);
+			case 4: return generateSquare(phase);
+			default: return generateSine(phase);
+			}
+		}
+	};
+
+private:
+	float fSampleRate = 0.0f;
+	float fPhasePos = 0.0f;
+	float fPhaseInc = 0.0f;
+	float* pfCircularBuffer = nullptr;
+	int iBufferWritePos = 0;
+	int iBufferReadPos = 0;
+	int iBufferSize = 0;
+	float fDel = 0.0f;
+};
+
 class MyFilters
 {
 public:
