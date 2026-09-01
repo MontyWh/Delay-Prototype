@@ -65,7 +65,7 @@ public:
 
 				float process(float input)
 				{
-					// Filter individual samples here - 𝑦0 = 𝑎𝑥0 + 𝑏𝑦-1
+					// Filter individual tapCount here - 𝑦0 = 𝑎𝑥0 + 𝑏𝑦-1
 					float fFirst = (input * fCurrentACoeff) + (fPreviousOutputFirst * fPreviousBCoeff);
 					fPreviousOutputFirst = fFirst;  // Store for next sample
 
@@ -103,7 +103,7 @@ public:
 
 				float process(float input)
 				{
-					// Filter individual samples here - 𝑦0 = 𝑎𝑥0 + 𝑏𝑦-1
+					// Filter individual tapCount here - 𝑦0 = 𝑎𝑥0 + 𝑏𝑦-1
 					float fLowPassFirst = (input * fCurrentACoeff) + (fPreviousOutputFirst * fPreviousBCoeff);
 					fPreviousOutputFirst = fLowPassFirst;  // Store for next sample
 					float fFirst = input - fLowPassFirst;
@@ -225,10 +225,10 @@ public:
 		float process(float input, float sampleRate)
 		{
 			float fSummedTaps = 0.0f;
-			for (int i = 0; i < iNumberOfDelays; i++) fSummedTaps += MultipleDelays[i].read(sampleRate);
+			for (int i = 0; i < iNumberOfDelays; i++) fSummedTaps += MultipleDelays[i].read(sampleRate); // Sum the outputs of all delay taps
 
 			float fWriteValue = input + LPF.process(fSummedTaps * fFeedbackGain);
-			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].write(fWriteValue);
+			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].write(fWriteValue); // Write the same value to all delay taps
 
 			return fSummedTaps;
 		}
@@ -276,9 +276,25 @@ public:
 				iBufferWritePos = 0; // Reset the write position to the start of the buffer
 			}
 
+			void setTapTempo(int tapState)
+			{
+				if (tapState == 1)
+				{
+					if (iTapState == 0)
+					{
+						iTapState = 1;
+						iTapCount = 0;
+					}
+					else
+					{
+						iTapState = 0;
+					}
+				}
+			}
+
 			float read(float sampleRate)
 			{
-				int readPos = iBufferWritePos - (int)(sampleRate * fDelayTime);
+				int readPos = iBufferWritePos - (int)(sampleRate * fDelayTime); // Calculate the read position based on the delay time
 				if (readPos < 0) readPos += iBufferSize;
 
 				return pfCircularBuffer[readPos];
@@ -289,9 +305,17 @@ public:
 				pfCircularBuffer[iBufferWritePos] = input;
 			}
 
-			void setTapTempo(int tapState)
+			float samplesToTimeToFrequency(int tapCount, float sampleRate)
 			{
-				iTapState = tapState;
+				float fTime = tapCount / sampleRate; // Convert tapCount to time in seconds
+				float fFrequency = 1.0f / fTime; // Convert time to frequency
+
+				return fFrequency;
+			}
+
+			void tapTempoPost(float sampleRate)
+			{
+				if (iTapState == 1) iTapCount++;
 			}
 
 			void postProcess()
