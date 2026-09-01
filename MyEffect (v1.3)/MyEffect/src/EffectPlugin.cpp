@@ -34,6 +34,9 @@ extern "C" {
 			{   "Bypass Delay",  Parameter::TOGGLE, 0, 1, 1, AUTO_SIZE  },
 			
 			{   "Number of Delays",  Parameter::MENU, { "1 Delay Line", "2 Delay Lines", "3 Delay Lines" }, AUTO_SIZE  },
+
+			{   "Tap Tempo",  Parameter::BUTTON, 0, 1, 0, AUTO_SIZE  },
+
 			{   "Delay Time 1",  Parameter::ROTARY, 0.001f, 0.1f, 0.025f, AUTO_SIZE  },
 			{   "Delay Time 2",  Parameter::ROTARY, 0.001f, 0.1f, 0.05f, AUTO_SIZE  },
 			{   "Delay  Time 3",  Parameter::ROTARY, 0.001f, 0.1f, 0.075f, AUTO_SIZE  },
@@ -94,6 +97,8 @@ void MyEffect::optionChanged(int iOptionMenu, int iItem)
 void MyEffect::buttonPressed(int iButton)
 {
     // A button, with index iButton, has been pressed
+
+	//for (int ch = 0; ch < 2; ch++) Delay[ch].setTapTempo(iButton);
 }
 
 // Applies audio processing to a buffer of audio
@@ -109,14 +114,12 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 	int iBypassDelay = parameters[1];  // 0 = off, 1 = on
 	int iNumberOfDelays = parameters[2] + 1;  // MENU exports 0, 1, 2 but we need 1, 2, 3
 
-	for (int i = 0; i < 3; i++) Delay[i].Delay.quantiseToMusicalValues(parameters[3 + i]);
+	float fDelayEffectTimes[3] = { parameters[4] * 10.0f, parameters[5] * 10.0f, parameters[6] * 10.0f };
 
-	float fDelayEffectTimes[3] = { parameters[3] * 10.0f, parameters[4] * 10.0f, parameters[5] * 10.0f };
+	float fFeedbackGain = parameters[7];
+	float fLpfCutoff = (50.0f + (pow(parameters[8], 3.0f) * (5000.0f - 50.0f))) / getSampleRate();
 
-	float fFeedbackGain = parameters[6];
-	float fLpfCutoff = (50.0f + (pow(parameters[7], 3.0f) * (5000.0f - 50.0f))) / getSampleRate();
-
-	float iBypassReverb = parameters[8];  // 0 = off, 1 = on
+	float iBypassReverb = parameters[9];  // 0 = off, 1 = on
 	
 	float fReverbPatterns[3][4];
 	float fReverbEffectTimes[4];
@@ -128,11 +131,11 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 	for (int i = 0; i < 3; i++)
 	{
-		for (int j = 0; j < 4; j++) fReverbEffectTimes[j] = fReverbPatterns[i][j] = parameters[9] * fReverbEffectTimeCoeffs[i][j];
+		for (int j = 0; j < 4; j++) fReverbEffectTimes[j] = fReverbPatterns[i][j] = parameters[10] * fReverbEffectTimeCoeffs[i][j];
 	}
 
-	float fMix = parameters[10] / 100.0f; // Convert from 0-100 to 0-1
-	float fOutputGain = parameters[11];
+	float fMix = parameters[11] / 100.0f; // Convert from 0-100 to 0-1
+	float fOutputGain = parameters[12];
 
 	// Set delay parameters for all channels
 	for (int ch = 0; ch < 2; ch++)
@@ -149,8 +152,8 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 			fIn[ch] = *pfInBuffer[ch]++;
 			fIn[ch] *= fInputGain; // Apply input gain
 
-			// Process: sum reverb taps before feedback
 			float fWet = fIn[ch];
+
 			if (iBypassDelay == 0) fWet = Delay[ch].process(fWet, fSampleRate);
 			if (iBypassReverb == 0) fWet = Reverb[ch].process(fWet, fSampleRate);
 

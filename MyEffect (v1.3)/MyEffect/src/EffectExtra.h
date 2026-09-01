@@ -206,23 +206,11 @@ public:
 		{
 			fFeedbackGain = 0.0f;
 			iNumberOfDelays = 1;
-			bUseMultipleDelayLines = false;
-		}
-
-		void set(float delayTime, float feedbackGain, float lpfCutoff)
-		{
-			Delay.set(delayTime);
-			fFeedbackGain = feedbackGain;
-			iNumberOfDelays = 1;
-			bUseMultipleDelayLines = false;
-
-			LPF.set(lpfCutoff);
 		}
 
 		void set(float *delayTimes, float feedbackGain, float lpfCutoff, int numDelays)
 		{
 			iNumberOfDelays = numDelays;
-			bUseMultipleDelayLines = true;
 			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].set(delayTimes[i]);
 			fFeedbackGain = feedbackGain;
 
@@ -231,39 +219,23 @@ public:
 
 		void initialiseBuffer(float sampleRate)
 		{
-			Delay.initialiseBuffer(sampleRate);
 			for (int i = 0; i < 3; i++) MultipleDelays[i].initialiseBuffer(sampleRate);
 		}
 
 		float process(float input, float sampleRate)
 		{
-			if (bUseMultipleDelayLines)
-			{
-				float fSummedTaps = 0.0f;
-				for (int i = 0; i < iNumberOfDelays; i++) fSummedTaps += MultipleDelays[i].read(sampleRate);
+			float fSummedTaps = 0.0f;
+			for (int i = 0; i < iNumberOfDelays; i++) fSummedTaps += MultipleDelays[i].read(sampleRate);
 
-				float fWriteValue = input + LPF.process(fSummedTaps * fFeedbackGain);
-				for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].write(fWriteValue);
+			float fWriteValue = input + LPF.process(fSummedTaps * fFeedbackGain);
+			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].write(fWriteValue);
 
-				return fSummedTaps;
-			}
-
-			float fTap = Delay.read(sampleRate);
-			float fWriteValue = input + LPF.process(fTap * fFeedbackGain);
-			Delay.write(fWriteValue);
-
-			return fTap;
+			return fSummedTaps;
 		}
 
 		void postProcess()
 		{
-			if (bUseMultipleDelayLines)
-			{
-				for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].postProcess();
-				return;
-			}
-
-			Delay.postProcess();
+			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].postProcess();
 		}
 
 		class MyDelay
@@ -278,6 +250,8 @@ public:
 				iBufferWritePos = 0;
 
 				fDelayTime = 0.0f;
+
+				iTapCount = iTapState = 0;
 			}
 
 			~MyDelay()
@@ -302,48 +276,6 @@ public:
 				iBufferWritePos = 0; // Reset the write position to the start of the buffer
 			}
 
-			static void quantiseToMusicalValues(float& delayTime, bool bQuantise = true) // Quantise delay times to nearest musical duration
-			{
-				if (!bQuantise) return;
-
-				// Musical timing values in current parameter range (whole note = 0.1f)
-				const float fMusicalValues[] = {
-					0.00625f,    // 1/16
-					0.008333333f,// 1/8 triplet / swing short
-					0.0125f,     // 1/8
-					0.016666667f,// 1/4 triplet / swing long
-					0.01875f,    // dotted 1/8
-					0.025f,      // 1/4
-					0.033333333f,// 1/2 triplet
-					0.0375f,     // dotted 1/4
-					0.05f,       // 1/2
-					0.066666667f,// whole triplet
-					0.075f,      // dotted 1/2
-					0.1f         // whole
-				};
-				const int iNumValues = sizeof(fMusicalValues) / sizeof(fMusicalValues[0]);
-
-				auto quantiseSingle = [&](float& delayTime)
-					{
-						float fNearest = fMusicalValues[0];
-						float fSmallestDiff = delayTime > fNearest ? delayTime - fNearest : fNearest - delayTime;
-
-						for (int i = 1; i < iNumValues; i++)
-						{
-							float fCurrentDiff = delayTime > fMusicalValues[i] ? delayTime - fMusicalValues[i] : fMusicalValues[i] - delayTime;
-							if (fCurrentDiff < fSmallestDiff)
-							{
-								fSmallestDiff = fCurrentDiff;
-								fNearest = fMusicalValues[i];
-							}
-						}
-
-						delayTime = fNearest;
-					};
-
-				quantiseSingle(delayTime);
-			}
-
 			float read(float sampleRate)
 			{
 				int readPos = iBufferWritePos - (int)(sampleRate * fDelayTime);
@@ -355,6 +287,11 @@ public:
 			void write(float input)
 			{
 				pfCircularBuffer[iBufferWritePos] = input;
+			}
+
+			void setTapTempo(int tapState)
+			{
+				iTapState = tapState;
 			}
 
 			void postProcess()
@@ -369,14 +306,15 @@ public:
 		private:
 			float fDelayTime;
 			float* pfCircularBuffer;
+
+			int iTapState;
+			int iTapCount;
 		};
 
-		MyDelay Delay;
 		MyDelay MultipleDelays[3];
 
 	private:
 		int iNumberOfDelays;
-		bool bUseMultipleDelayLines;
 		float fFeedbackGain;
 
 		MyFilters::MyIirFilter::MyBiQuadFilter::MyLowPassFilter LPF;
@@ -395,15 +333,15 @@ public:
 		{
 			iNumberOfDelayGroups = numDelays;
 			for (int i = 0; i < iNumberOfDelayGroups; i++)
-				for (int j = 0; j < 4; j++) Delays[i][j].set(delayTimes[i][j], feedbackGain, lpfCutoff);
+				for (int j = 0; j < 4; j++) Delays[i][j].set(&delayTimes[i][j], feedbackGain, lpfCutoff, 1);
 		}
 
 		int tapPos(int delayIndex, float time, float sampleRate)
 		{
 			int i = delayIndex / 4;
 			int j = delayIndex % 4;
-			int iBufferReadPos = Delays[i][j].Delay.iBufferWritePos - (time * sampleRate);
-			if (iBufferReadPos < 0) iBufferReadPos += Delays[i][j].Delay.iBufferSize;
+			int iBufferReadPos = Delays[i][j].MultipleDelays[0].iBufferWritePos - (time * sampleRate);
+			if (iBufferReadPos < 0) iBufferReadPos += Delays[i][j].MultipleDelays[0].iBufferSize;
 			return iBufferReadPos;
 		}
 
