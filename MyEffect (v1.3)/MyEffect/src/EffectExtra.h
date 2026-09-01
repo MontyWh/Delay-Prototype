@@ -7,17 +7,17 @@
 
 #pragma once
 
-class MyTremolo
+class MyModulator
 {
 public:
-	MyTremolo()
+	MyModulator()
 	{
 
 	}
 
-	~MyTremolo()
+	~MyModulator()
 	{
-
+		destroy();
 	}
 
 	void initialise(float sampleRate)
@@ -60,7 +60,7 @@ public:
 		fPhaseInc = 0.0f;
 	}
 
-	float process(float input, float depth, float wet, float outputGain)
+	float process(float input, float depth, float wet, float outputGain, int waveType)
 	{
 		if (!pfCircularBuffer || iBufferSize <= 1) // Check if the circular buffer is valid
 			return input;
@@ -76,12 +76,40 @@ public:
 			iBufferReadPos -= iBufferSize;
 		fDel = pfCircularBuffer[iBufferReadPos];
 
-		const float fMod = std::sin(fPhasePos);
+		float fMod = 0.0f;
+		switch (waveType)
+		{
+			case 0: fMod = WaveTypes::generateSine(fPhasePos); break;
+			case 1: fMod = WaveTypes::generateTriangle(fPhasePos); break;
+			case 2: fMod = WaveTypes::generateSawtooth(fPhasePos); break;
+			case 3: fMod = WaveTypes::generatePulse(fPhasePos, 0.5f); break;
+			case 4: fMod = WaveTypes::generateSquare(fPhasePos); break;
+			default: fMod = WaveTypes::generateSine(fPhasePos); break;
+		}
 		const float fOsc = ((fMod + 1.0f) * 0.5f) * depth;
 		const float fTremGain = (1.0f - depth) + fOsc;
 		const float fWet = input * fTremGain;
 
 		return ((1.0f - wet) * input + (wet * fWet)) * outputGain;
+	}
+
+	float processOffset(float depth, int waveType)
+	{
+		if (!pfCircularBuffer || iBufferSize <= 1) // Check if the circular buffer is valid
+			return 0.0f;
+
+		float fMod = 0.0f;
+		switch (waveType)
+		{
+			case 0: fMod = WaveTypes::generateSine(fPhasePos); break;
+			case 1: fMod = WaveTypes::generateTriangle(fPhasePos); break;
+			case 2: fMod = WaveTypes::generateSawtooth(fPhasePos); break;
+			case 3: fMod = WaveTypes::generatePulse(fPhasePos, 0.5f); break;
+			case 4: fMod = WaveTypes::generateSquare(fPhasePos); break;
+			default: fMod = WaveTypes::generateSine(fPhasePos); break;
+		}
+
+		return depth * fMod;
 	}
 
 	void postProcess()
@@ -375,9 +403,9 @@ public:
 		Reverb.set(fReverbPatterns, fFeedbackGain, fLpfCutoff, iNumberOfDelays);
 	}
 
-	float process(float input, float sampleRate, int bypassDelay, int bypassReverb)
+	float process(float input, float sampleRate, int bypassDelay, int bypassReverb, float fModRate, float fModDepth, float fModDelayTime)
 	{
-		if (bypassDelay == 0) input = Delay.process(input, sampleRate);
+		if (bypassDelay == 0) input = Delay.process(input, sampleRate, fModRate, fModDepth, fModDelayTime);
 		if (bypassReverb == 0) input = Reverb.process(input, sampleRate);
 
 		return input;
@@ -423,10 +451,10 @@ public:
 			for (int i = 0; i < 3; i++) MultipleDelays[i].initialiseBuffer(sampleRate);
 		}
 
-		float process(float input, float sampleRate)
+		float process(float input, float sampleRate, float fModRate, float fModDepth, float fModDelayTime)
 		{
 			float fSummedTaps = 0.0f;
-			for (int i = 0; i < iNumberOfDelays; i++) fSummedTaps += MultipleDelays[i].read(sampleRate); // Sum the outputs of all delay taps
+			for (int i = 0; i < iNumberOfDelays; i++) fSummedTaps += MultipleDelays[i].read(sampleRate, fModRate, fModDepth, fModDelayTime); // Sum the outputs of all delay taps
 
 			float fWriteValue = input + LPF.process(fSummedTaps * fFeedbackGain);
 			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].write(fWriteValue); // Write the same value to all delay taps
@@ -486,6 +514,7 @@ public:
 				for (int i = 0; i < iBufferSize; i++) pfCircularBuffer[i] = 0.0f; // Initialise the circular buffer to zero
 
 				iBufferWritePos = 0; // Reset the write position to the start of the buffer
+				Mod.initialise(sampleRate);
 			}
 
 			bool setTapTempo(float sampleRate)
@@ -511,11 +540,18 @@ public:
 				return false;
 			}
 
-			float read(float sampleRate)
+			float read(float sampleRate, float fModRate, float fModDepth, float fModDelayTime)
 			{
-				int readPos = iBufferWritePos - (int)(sampleRate * fDelayTime); // Calculate the read position based on the delay time
+				Mod.setupValues(fModRate);
+				float z = Mod.processOffset(fModDepth, 1);
+				float fModulatedDelayTime = fModDelayTime + z;
+				float fOutputDelayTime = fDelayTime + fModulatedDelayTime;
+				if (fOutputDelayTime < 0.001f) fOutputDelayTime = 0.001f;
+				if (fOutputDelayTime > 2.0f) fOutputDelayTime = 2.0f;
+				int readPos = iBufferWritePos - (int)(sampleRate * fOutputDelayTime); // Calculate the read position based on the delay time
 				if (readPos < 0) readPos += iBufferSize;
 
+				Mod.postProcess();
 				return pfCircularBuffer[readPos];
 			}
 
@@ -570,6 +606,8 @@ public:
 			int iTapCount;
 			float fTapIntervalMultiplier = 1.0f;
 			float fTapPulseMultiplier = 1.0f;
+
+			MyModulator Mod;
 		};
 
 		MyDelay MultipleDelays[3];
@@ -610,7 +648,7 @@ public:
 		{
 			float fSummedTaps = 0.0f;
 			for (int i = 0; i < iNumberOfDelayGroups; i++)
-				for (int j = 0; j < 4; j++) fSummedTaps += Delays[i][j].process(input, sampleRate);
+				for (int j = 0; j < 4; j++) fSummedTaps += Delays[i][j].process(input, sampleRate, 0.0f, 0.0f, 0.0f);
 			return fSummedTaps;
 		}
 
