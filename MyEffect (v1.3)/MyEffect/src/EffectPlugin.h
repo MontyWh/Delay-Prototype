@@ -24,6 +24,8 @@ public:
     void setSampleRate(float sampleRate){ stk::Stk::setSampleRate(sampleRate); }
     float getSampleRate() const { return stk::Stk::sampleRate(); };
     
+    void wetDryBlend(float  fOut[2], int ch, float  fWet[2], float fMix, float  fDry[2]);
+
     void process(const float** inputBuffers, float** outputBuffers, int numSamples);
     
     void presetLoaded(int iPresetNum, const char *sPresetName);
@@ -33,8 +35,7 @@ public:
 private:
 	// Declare shared member variables here
 
-	MyEcho::MyMultiLineDelay Delay[2];
-	MyEcho::MyReverb Reverb[2];
+	MyEcho echo[2]; // Two instances of MyEcho for stereo processing
 
-	float fSampleRate;
+    float fSampleRate;
 };

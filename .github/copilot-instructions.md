@@ -9,3 +9,4 @@
 - User prefers refactors that simplify code while preserving existing behavior (no functional changes).
 - User prefers tap-tempo state tracking with iTapState[2] representing old/new button states for edge detection.
 - User prefers tap tempo to scale/relate existing delayTimes via coefficients, preserving manual delay-time controls alongside tap tempo.
+- User prefers using `pow(x, y)` style expressions instead of bit-shift expressions for delay-time divisor calculations.

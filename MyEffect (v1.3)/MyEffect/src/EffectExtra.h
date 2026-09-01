@@ -16,7 +16,6 @@ public:
 	public:
 		float filterShelfHybridSplitter(float input, float filtered, float gain)
 		{
-			// Calculate blend factor ONCE, before using it on each sample
 			float fBlend;
 			if (gain < 3.0f)
 			{
@@ -198,6 +197,41 @@ public:
 class MyEcho
 {
 public:
+
+	MyEcho() {}
+
+	void initialise(float sampleRate)
+	{
+		Delay.initialiseBuffer(sampleRate);
+		Reverb.initialiseBuffer(sampleRate);
+	}
+
+	void setDelayTapTempo(float sampleRate)
+	{
+		Delay.setTapTempo(sampleRate);
+	}
+
+	void setupParameters(float* fDelayEffectTimes, float fReverbPatterns[][4], float fFeedbackGain, float fLpfCutoff, int iNumberOfDelays)
+	{
+		Delay.set(fDelayEffectTimes, fFeedbackGain, fLpfCutoff, iNumberOfDelays);
+		Reverb.set(fReverbPatterns, fFeedbackGain, fLpfCutoff, iNumberOfDelays);
+	}
+
+	float process(float input, float sampleRate, int bypassDelay, int bypassReverb)
+	{
+		if (bypassDelay == 0) input = Delay.process(input, sampleRate);
+		if (bypassReverb == 0) input = Reverb.process(input, sampleRate);
+
+		return input;
+	}
+
+	void postProcess()
+	{
+		Delay.tapTempoPost();
+		Delay.postProcess();
+		Reverb.postProcess();
+	}
+
 	class MyMultiLineDelay
 	{
 	public:
@@ -217,6 +251,15 @@ public:
 			LPF.set(lpfCutoff);
 		}
 
+		void setTapTempo(float sampleRate)
+		{
+			if (MultipleDelays[0].setTapTempo(sampleRate))
+			{
+				float fTapTime = MultipleDelays[0].getDelayTime();
+				for (int i = 1; i < iNumberOfDelays; i++) MultipleDelays[i].setTappedDelayTime(fTapTime / pow(2.0f, (float)i));
+			}
+		}
+
 		void initialiseBuffer(float sampleRate)
 		{
 			for (int i = 0; i < 3; i++) MultipleDelays[i].initialiseBuffer(sampleRate);
@@ -231,6 +274,11 @@ public:
 			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].write(fWriteValue); // Write the same value to all delay taps
 
 			return fSummedTaps;
+		}
+
+		void tapTempoPost()
+		{
+			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].tapTempoPost();
 		}
 
 		void postProcess()
@@ -250,6 +298,7 @@ public:
 				iBufferWritePos = 0;
 
 				fDelayTime = 0.0f;
+				fManualDelayTime = 0.0f;
 
 				iTapCount = iTapState = 0;
 			}
@@ -261,7 +310,12 @@ public:
 
 			void set(float delayTime)
 			{
-				fDelayTime = delayTime;
+				float fDelayTimeDiff = delayTime - fManualDelayTime;
+				if (fDelayTimeDiff < -0.000001f || fDelayTimeDiff > 0.000001f)
+				{
+					fManualDelayTime = delayTime;
+					fDelayTime = delayTime;
+				}
 			}
 
 			void initialiseBuffer(float sampleRate)
@@ -276,20 +330,27 @@ public:
 				iBufferWritePos = 0; // Reset the write position to the start of the buffer
 			}
 
-			void setTapTempo(int tapState)
+			bool setTapTempo(float sampleRate)
 			{
-				if (tapState == 1)
+				if (iTapState == 0)
 				{
-					if (iTapState == 0)
+					iTapState = 1;
+					iTapCount = 0;
+					return false;
+				}
+				else
+				{
+					iTapState = 0;
+
+					float fFrequency = samplesToTimeToFrequency(iTapCount, sampleRate);
+					if (fFrequency > 0.0f)
 					{
-						iTapState = 1;
-						iTapCount = 0;
-					}
-					else
-					{
-						iTapState = 0;
+						setTappedDelayTime(1.0f / (fFrequency * fTapPulseMultiplier));
+						return true;
 					}
 				}
+
+				return false;
 			}
 
 			float read(float sampleRate)
@@ -300,6 +361,18 @@ public:
 				return pfCircularBuffer[readPos];
 			}
 
+			float getDelayTime()
+			{
+				return fDelayTime;
+			}
+
+			void setTappedDelayTime(float delayTime)
+			{
+				fDelayTime = delayTime;
+				if (fDelayTime < 0.001f) fDelayTime = 0.001f;
+				if (fDelayTime > 2.0f) fDelayTime = 2.0f;
+			}
+
 			void write(float input)
 			{
 				pfCircularBuffer[iBufferWritePos] = input;
@@ -307,13 +380,16 @@ public:
 
 			float samplesToTimeToFrequency(int tapCount, float sampleRate)
 			{
-				float fTime = tapCount / sampleRate; // Convert tapCount to time in seconds
-				float fFrequency = 1.0f / fTime; // Convert time to frequency
+				if (tapCount <= 0 || sampleRate <= 0.0f) return 0.0f;
 
+				float fTime = ((float)tapCount / sampleRate) * fTapIntervalMultiplier;
+				if (fTime <= 0.0f) return 0.0f;
+
+				float fFrequency = 1.0f / fTime; // Convert time to frequency
 				return fFrequency;
 			}
 
-			void tapTempoPost(float sampleRate)
+			void tapTempoPost()
 			{
 				if (iTapState == 1) iTapCount++;
 			}
@@ -329,10 +405,13 @@ public:
 
 		private:
 			float fDelayTime;
+			float fManualDelayTime;
 			float* pfCircularBuffer;
 
 			int iTapState;
 			int iTapCount;
+			float fTapIntervalMultiplier = 1.0f;
+			float fTapPulseMultiplier = 1.0f;
 		};
 
 		MyDelay MultipleDelays[3];
@@ -353,7 +432,7 @@ public:
 				for (int j = 0; j < 4; j++) Delays[i][j].initialiseBuffer(sampleRate);
 		}
 
-		void set(float delayTimes[3][4], float feedbackGain, float lpfCutoff, int numDelays)
+		void set(float delayTimes[][4], float feedbackGain, float lpfCutoff, int numDelays)
 		{
 			iNumberOfDelayGroups = numDelays;
 			for (int i = 0; i < iNumberOfDelayGroups; i++)
@@ -362,10 +441,10 @@ public:
 
 		int tapPos(int delayIndex, float time, float sampleRate)
 		{
-			int i = delayIndex / 4;
-			int j = delayIndex % 4;
-			int iBufferReadPos = Delays[i][j].MultipleDelays[0].iBufferWritePos - (time * sampleRate);
-			if (iBufferReadPos < 0) iBufferReadPos += Delays[i][j].MultipleDelays[0].iBufferSize;
+			int iDelayGroup = delayIndex / 4;
+			int iDelayGroupTarget = delayIndex % 4;
+			int iBufferReadPos = Delays[iDelayGroup][iDelayGroupTarget].MultipleDelays[0].iBufferWritePos - (time * sampleRate); // Calculate the read position based on the delay time
+			if (iBufferReadPos < 0) iBufferReadPos += Delays[iDelayGroup][iDelayGroupTarget].MultipleDelays[0].iBufferSize; // Wrap around if necessary
 			return iBufferReadPos;
 		}
 
@@ -388,4 +467,8 @@ public:
 	private:
 		int iNumberOfDelayGroups = 0;
 	};
+
+	private:
+		MyEcho::MyMultiLineDelay Delay;
+		MyEcho::MyReverb Reverb;
 };

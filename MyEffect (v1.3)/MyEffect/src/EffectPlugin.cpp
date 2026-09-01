@@ -39,7 +39,7 @@ extern "C" {
 
 			{   "Delay Time 1",  Parameter::ROTARY, 0.001f, 0.1f, 0.025f, AUTO_SIZE  },
 			{   "Delay Time 2",  Parameter::ROTARY, 0.001f, 0.1f, 0.05f, AUTO_SIZE  },
-			{   "Delay  Time 3",  Parameter::ROTARY, 0.001f, 0.1f, 0.075f, AUTO_SIZE  },
+			{   "Delay Time 3",  Parameter::ROTARY, 0.001f, 0.1f, 0.075f, AUTO_SIZE  },
 
             {   "Delay Feedback Gain",  Parameter::ROTARY, 0.0f, 0.25f, 0.125f, AUTO_SIZE  },
 
@@ -67,11 +67,11 @@ MyEffect::MyEffect(const Parameters& parameters, const Presets& presets)
 : Effect(parameters, presets)
 {
 	// Initialise member variables, etc.
-	fSampleRate = getSampleRate();
 	for (int ch = 0; ch < 2; ch++)
 	{
-		Delay[ch].initialiseBuffer(fSampleRate);
-		Reverb[ch].initialiseBuffer(fSampleRate);
+		echo[ch].initialise(getSampleRate());
+
+		fSampleRate = getSampleRate();
 	}
 }
 
@@ -96,16 +96,25 @@ void MyEffect::optionChanged(int iOptionMenu, int iItem)
 
 void MyEffect::buttonPressed(int iButton)
 {
-    // A button, with index iButton, has been pressed
+	// A button, with index iButton, has been pressed
 
-	//for (int ch = 0; ch < 2; ch++) Delay[ch].setTapTempo(iButton);
+	if (iButton == 3)
+	{
+		for (int ch = 0; ch < 2; ch++) echo[ch].setDelayTapTempo(fSampleRate);
+	}
+}
+
+void MyEffect::wetDryBlend(float  output[2], int channel, float  wet[2], float wetDryBlend, float  dry[2])
+{
+	output[channel] = wet[channel] * wetDryBlend + dry[channel] * (1.0f - wetDryBlend); // Apply mix
 }
 
 // Applies audio processing to a buffer of audio
 // (inputBuffer contains the input audio, and processed samples should be stored in outputBuffer)
 void MyEffect::process(const float** inputBuffers, float** outputBuffers, int numSamples)
 {
-	float fIn[2], fOut[2] = { 0, 0, };
+	float fIn[2] = { 0, 0, };
+	float fOut[2] = { 0, 0, };
 	const float* pfInBuffer[2] = { inputBuffers[0], inputBuffers[1] };
 	float *pfOutBuffer[2] = { outputBuffers[0], outputBuffers[1] };
 
@@ -117,7 +126,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 	float fDelayEffectTimes[3] = { parameters[4] * 10.0f, parameters[5] * 10.0f, parameters[6] * 10.0f };
 
 	float fFeedbackGain = parameters[7];
-	float fLpfCutoff = (50.0f + (pow(parameters[8], 3.0f) * (5000.0f - 50.0f))) / getSampleRate();
+	float fLpfCutoff = (50.0f + (pow(parameters[8], 3.0f) * (5000.0f - 50.0f))) / fSampleRate;
 
 	float iBypassReverb = parameters[9];  // 0 = off, 1 = on
 	
@@ -140,8 +149,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 	// Set delay parameters for all channels
 	for (int ch = 0; ch < 2; ch++)
 	{
-		Delay[ch].set(fDelayEffectTimes, fFeedbackGain, fLpfCutoff, iNumberOfDelays);		
-		Reverb[ch].set(fReverbPatterns, fFeedbackGain, fLpfCutoff, iNumberOfDelays);
+		echo[ch].setupParameters(fDelayEffectTimes, fReverbPatterns, fFeedbackGain, fLpfCutoff, iNumberOfDelays);
 	}
 
 	while (numSamples--)
@@ -150,21 +158,19 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 		{
 			// Get sample from input
 			fIn[ch] = *pfInBuffer[ch]++;
-			fIn[ch] *= fInputGain; // Apply input gain
 
-			float fWet = fIn[ch];
+			float fDry[2], fWet[2];
+			fWet[ch] = fDry[ch] = fIn[ch];
 
-			if (iBypassDelay == 0) fWet = Delay[ch].process(fWet, fSampleRate);
-			if (iBypassReverb == 0) fWet = Reverb[ch].process(fWet, fSampleRate);
+			fWet[ch] = echo[ch].process(fWet[ch], fSampleRate, iBypassDelay, iBypassReverb);
 
-			fOut[ch] = fWet * fMix + fIn[ch] * (1.0f - fMix); // Apply mix
+			wetDryBlend(fOut, ch, fWet, fMix, fDry); // Apply wet/dry mix
 			fOut[ch] *= fOutputGain; // Apply output gain
 
 			// Copy result to output
 			*pfOutBuffer[ch]++ = fOut[ch];
 
-			Delay[ch].postProcess();
-			Reverb[ch].postProcess();
+			echo[ch].postProcess();
 		}
 	}
 }
