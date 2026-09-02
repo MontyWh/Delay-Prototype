@@ -35,9 +35,9 @@ extern "C" {
 
 			{   "Bypass Delay Modulation",  Parameter::TOGGLE, 0, 1, 1, AUTO_SIZE  },
 			
-			{   "Mod Rate",  Parameter::ROTARY, 0.05f, 1.0f, 1.0f, AUTO_SIZE  },
-			{   "Mod Depth",  Parameter::ROTARY, 0.0f, 0.02f, 0.02f, AUTO_SIZE  },
-			{   "Mod Delay Time",  Parameter::ROTARY, 0.05f, 2.0f, 1.75f, AUTO_SIZE  },
+			{   "Mod Rate",  Parameter::ROTARY, 0.05f, 1.0f, 0.0f, AUTO_SIZE  },
+			{   "Mod Depth",  Parameter::ROTARY, 0.0f, 0.02f, 0.005f, AUTO_SIZE  },
+			{   "Mod Delay Time",  Parameter::ROTARY, 0.05f, 2.0f, 0.05f, AUTO_SIZE  },
 
 			{   "Number of Delays",  Parameter::MENU, { "1 Delay Line", "2 Delay Lines", "3 Delay Lines" }, AUTO_SIZE  },
 
@@ -49,7 +49,7 @@ extern "C" {
 
             {   "Delay Feedback Gain",  Parameter::ROTARY, 0.0f, 0.25f, 0.125f, AUTO_SIZE  },
 
-			{	"LPF Cutoff",  Parameter::ROTARY, 0.0f, 1.0f, 0.0f, AUTO_SIZE },
+			{	"LPF Cutoff",  Parameter::ROTARY, 0.0f, 1.0f, 1.0f, AUTO_SIZE },
 
 			{   "Bypass Reverb",  Parameter::TOGGLE, 0, 1, 0, AUTO_SIZE  },			
 			{   "Reverb Master Time",  Parameter::ROTARY, 0.01f, 0.4f, 0.4f, AUTO_SIZE  },
@@ -148,7 +148,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 	for (int i = 0; i < 3; i++) fDelayEffectTimes[i] = parameters[8 + i] * 10.0f;
 
 	float fFeedbackGain = parameters[11];
-	float fLpfCutoff = (50.0f + (pow(parameters[12], 3.0f) * (5000.0f - 50.0f))) / fSampleRate;
+	float fLpfCutoff = (20.0f + (pow(parameters[12], 3.0f) * (20000.0f - 20.0f))) / fSampleRate;
 
 	float iBypassReverb = parameters[13];  // 0 = off, 1 = on
 

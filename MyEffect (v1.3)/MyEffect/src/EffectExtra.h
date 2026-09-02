@@ -439,7 +439,7 @@ public:
 			if (MultipleDelays[0].setTapTempo(sampleRate))
 			{
 				float fTapTime = MultipleDelays[0].fDelayTime;
-				for (int i = 1; i < iNumberOfDelays; i++) MultipleDelays[i].setTappedDelayTime(fTapTime / pow(2.0f, (float)i));
+				for (int i = 1; i < iNumberOfDelays; i++) MultipleDelays[i].setTappedDelayTime(fTapTime / pow(3.0f, (float)i));
 			}
 		}
 
@@ -450,19 +450,16 @@ public:
 
 		float process(float input, float sampleRate, int bypassDelayMod, float fModRate, float fModDepth, float fModDelayTime)
 		{
-			float fSummedTaps = 0.0f;
 			float fSummedFilteredTaps = 0.0f;
 			for (int i = 0; i < iNumberOfDelays; i++)
 			{
-				float fTap = MultipleDelays[i].read(sampleRate, bypassDelayMod, fModRate, fModDepth, fModDelayTime); // Sum the outputs of all delay taps
-				fSummedTaps += fTap;
-				fSummedFilteredTaps += MultipleDelays[i].lowPassFilter(fTap);
+				fSummedFilteredTaps += MultipleDelays[i].read(sampleRate, bypassDelayMod, fModRate, fModDepth, fModDelayTime); // Sum the outputs of all delay taps
 			}
 
 			float fWriteValue = input + (fSummedFilteredTaps * fFeedbackGain);
 			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].write(fWriteValue); // Write the same value to all delay taps
 
-			return fSummedTaps;
+			return fSummedFilteredTaps;
 		}
 
 		void tapTempoPost()
@@ -557,7 +554,7 @@ public:
 				int readPos = iBufferWritePos - (int)(sampleRate * fOutputDelayTime); // Calculate the read position based on the delay time
 				if (readPos < 0) readPos += iBufferSize;
 
-				return pfCircularBuffer[readPos];
+				return LPF.process(pfCircularBuffer[readPos]);
 			}
 
 			void setTappedDelayTime(float delayTime)
