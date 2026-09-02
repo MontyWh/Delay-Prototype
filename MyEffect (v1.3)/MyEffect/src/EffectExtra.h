@@ -398,9 +398,9 @@ public:
 		Reverb.set(fReverbPatterns, fFeedbackGain, fLpfCutoff, iNumberOfDelays);
 	}
 
-	float process(float input, float sampleRate, int bypassDelay, int bypassReverb, float fModRate, float fModDepth, float fModDelayTime)
+	float process(float input, float sampleRate, int bypassDelay, int bypassDelayMod, int bypassReverb, float fModRate, float fModDepth, float fModDelayTime)
 	{
-		if (bypassDelay == 0) input = Delay.process(input, sampleRate, fModRate, fModDepth, fModDelayTime);
+		if (bypassDelay == 0) input = Delay.process(input, sampleRate, bypassDelayMod, fModRate, fModDepth, fModDelayTime);
 		if (bypassReverb == 0) input = Reverb.process(input, sampleRate);
 
 		return input;
@@ -446,10 +446,10 @@ public:
 			for (int i = 0; i < 3; i++) MultipleDelays[i].initialiseBuffer(sampleRate);
 		}
 
-		float process(float input, float sampleRate, float fModRate, float fModDepth, float fModDelayTime)
+		float process(float input, float sampleRate, int bypassDelayMod, float fModRate, float fModDepth, float fModDelayTime)
 		{
 			float fSummedTaps = 0.0f;
-			for (int i = 0; i < iNumberOfDelays; i++) fSummedTaps += MultipleDelays[i].read(sampleRate, fModRate, fModDepth, fModDelayTime); // Sum the outputs of all delay taps
+			for (int i = 0; i < iNumberOfDelays; i++) fSummedTaps += MultipleDelays[i].read(sampleRate, bypassDelayMod, fModRate, fModDepth, fModDelayTime); // Sum the outputs of all delay taps
 
 			float fWriteValue = input + LPF.process(fSummedTaps * fFeedbackGain);
 			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].write(fWriteValue); // Write the same value to all delay taps
@@ -479,7 +479,7 @@ public:
 				iBufferWritePos = 0;
 
 				fDelayTime = 0.0f;
-				fManualDelayTime = 0.0f;
+				fOutputDelayTime = 0.0f;
 
 				iTapCount = iTapState = 0;
 			}
@@ -491,10 +491,9 @@ public:
 
 			void set(float delayTime)
 			{
-				float fDelayTimeDiff = delayTime - fManualDelayTime;
+				float fDelayTimeDiff = delayTime - fDelayTime;
 				if (fDelayTimeDiff < -0.000001f || fDelayTimeDiff > 0.000001f)
 				{
-					fManualDelayTime = delayTime;
 					fDelayTime = delayTime;
 				}
 			}
@@ -535,18 +534,21 @@ public:
 				return false;
 			}
 
-			float read(float sampleRate, float fModRate, float fModDepth, float fModDelayTime)
+			float read(float sampleRate, int bypassDelayMod, float fModRate, float fModDepth, float fModDelayTime)
 			{
-				Mod.setupValues(fModRate);
-				float fDelayOffset = Mod.processOffset(fModDepth, 1); // Get the modulation offset for the delay time
-				fModDelayTime = fModDelayTime + fDelayOffset;
-				float fOutputDelayTime = fDelayTime + fModDelayTime;
+				if (bypassDelayMod == 0)
+				{
+					Mod.setupValues(fModRate);
+					float fDelayOffset = Mod.processOffset(fModDepth, 1); // Get the modulation offset for the delay time
+					fModDelayTime = fModDelayTime + fDelayOffset;
+					Mod.postProcess();
+				}
+				fOutputDelayTime = fDelayTime + fModDelayTime;
 				if (fOutputDelayTime < 0.001f) fOutputDelayTime = 0.001f;
 				if (fOutputDelayTime > 2.0f) fOutputDelayTime = 2.0f;
 				int readPos = iBufferWritePos - (int)(sampleRate * fOutputDelayTime); // Calculate the read position based on the delay time
 				if (readPos < 0) readPos += iBufferSize;
 
-				Mod.postProcess();
 				return pfCircularBuffer[readPos];
 			}
 
@@ -588,8 +590,9 @@ public:
 			int iBufferSize;
 			float fDelayTime;
 
+			float fOutputDelayTime;
+
 		private:
-			float fManualDelayTime;
 			float* pfCircularBuffer;
 
 			int iTapState;
@@ -622,7 +625,7 @@ public:
 		{
 			iNumberOfDelayGroups = numDelays;
 			for (int i = 0; i < iNumberOfDelayGroups; i++)
-				for (int j = 0; j < 4; j++) Delays[i][j].set(&delayTimes[i][j], feedbackGain, lpfCutoff, 1);
+				for (int j = 0; j < 4; j++) Delays[i][j].set(&delayTimes[i][j], feedbackGain, lpfCutoff, 3);
 		}
 
 		int tapPos(int delayIndex, float time, float sampleRate)
@@ -638,7 +641,7 @@ public:
 		{
 			float fSummedTaps = 0.0f;
 			for (int i = 0; i < iNumberOfDelayGroups; i++)
-				for (int j = 0; j < 4; j++) fSummedTaps += Delays[i][j].process(input, sampleRate, 0.0f, 0.0f, 0.0f);
+				for (int j = 0; j < 4; j++) fSummedTaps += Delays[i][j].process(input, sampleRate, 0, 0.0f, 0.0f, 0.0f);
 			return fSummedTaps;
 		}
 
@@ -656,6 +659,4 @@ public:
 
 	MyEcho::MyMultiLineDelay Delay;
 	MyEcho::MyReverb Reverb;
-
-	private:
 };

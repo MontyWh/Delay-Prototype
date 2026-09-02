@@ -33,6 +33,8 @@ extern "C" {
 
 			{   "Bypass Delay",  Parameter::TOGGLE, 0, 1, 1, AUTO_SIZE  },
 
+			{   "Bypass Delay Modulation",  Parameter::TOGGLE, 0, 1, 1, AUTO_SIZE  },
+			
 			{   "Mod Rate",  Parameter::ROTARY, 0.05f, 1.0f, 1.0f, AUTO_SIZE  },
 			{   "Mod Depth",  Parameter::ROTARY, 0.0f, 0.02f, 0.02f, AUTO_SIZE  },
 			{   "Mod Delay Time",  Parameter::ROTARY, 0.05f, 2.0f, 1.75f, AUTO_SIZE  },
@@ -57,9 +59,9 @@ extern "C" {
         };
 
         const Presets PRESETS = {
-            { "Preset 1", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { "Preset 2", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { "Preset 3", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { "Preset 1", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { "Preset 2", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { "Preset 3", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
         };
 
         return (APDI::Effect*)new MyEffect(CONTROLS, PRESETS);
@@ -102,9 +104,19 @@ void MyEffect::buttonPressed(int iButton)
 {
 	// A button, with index iButton, has been pressed
 
-	if (iButton == 6)
+	if (iButton == 7)
 	{
 		for (int ch = 0; ch < 2; ch++) Echo[ch].Delay.setTapTempo(fSampleRate); // Set tap tempo for both channels
+
+		int iNumberOfDelays = parameters[6] + 1;
+		if (iNumberOfDelays > 3) iNumberOfDelays = 3;
+		for (int i = 0; i < iNumberOfDelays; i++)
+		{
+			float fUiDelayTime = Echo[0].Delay.MultipleDelays[i].fDelayTime / 10.0f;
+			if (fUiDelayTime < 0.001f) fUiDelayTime = 0.001f;
+			if (fUiDelayTime > 0.1f) fUiDelayTime = 0.1f;
+			parameters[8 + i] = fUiDelayTime;
+		}
 	}
 }
 
@@ -126,18 +138,19 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 	int iBypassDelay = parameters[1];  // 0 = off, 1 = on
 
-	float fModRate = parameters[2];
-	float fModDepth = parameters[3];
-	float fModDelayTime = parameters[4];
+	int iBypassDelayMod = parameters[2];  // 0 = off, 1 = on
+	float fModRate = parameters[3];
+	float fModDepth = parameters[4];
+	float fModDelayTime = parameters[5];
 
-	int iNumberOfDelays = parameters[5] + 1;  // MENU exports 0, 1, 2 but we need 1, 2, 3
+	int iNumberOfDelays = parameters[6] + 1;  // MENU exports 0, 1, 2 but we need 1, 2, 3
 
-	float fDelayEffectTimes[3] = { parameters[7] * 10.0f, parameters[8] * 10.0f, parameters[9] * 10.0f };
+	for (int i = 0; i < 3; i++) fDelayEffectTimes[i] = parameters[8 + i] * 10.0f;
 
-	float fFeedbackGain = parameters[10];
-	float fLpfCutoff = (50.0f + (pow(parameters[11], 3.0f) * (5000.0f - 50.0f))) / fSampleRate;
+	float fFeedbackGain = parameters[11];
+	float fLpfCutoff = (50.0f + (pow(parameters[12], 3.0f) * (5000.0f - 50.0f))) / fSampleRate;
 
-	float iBypassReverb = parameters[12];  // 0 = off, 1 = on
+	float iBypassReverb = parameters[13];  // 0 = off, 1 = on
 
 	float fReverbPatterns[3][4];
 	float fReverbEffectTimes[4];
@@ -149,11 +162,11 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 	for (int i = 0; i < 3; i++)
 	{
-		for (int j = 0; j < 4; j++) fReverbEffectTimes[j] = fReverbPatterns[i][j] = parameters[13] * fReverbEffectTimeCoeffs[i][j];
+		for (int j = 0; j < 4; j++) fReverbEffectTimes[j] = fReverbPatterns[i][j] = parameters[14] * fReverbEffectTimeCoeffs[i][j];
 	}
 
-	float fMix = parameters[14] / 100.0f; // Convert from 0-100 to 0-1
-	float fOutputGain = parameters[15];
+	float fMix = parameters[15] / 100.0f; // Convert from 0-100 to 0-1
+	float fOutputGain = parameters[16];
 
 	// Set delay parameters for all channels
 	for (int ch = 0; ch < 2; ch++)
@@ -171,7 +184,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 			float fDry[2], fWet[2];
 			fWet[ch] = fDry[ch] = fIn[ch];
 
-			fWet[ch] = Echo[ch].process(fWet[ch], fSampleRate, iBypassDelay, iBypassReverb, fModRate, fModDepth, fModDelayTime);
+			fWet[ch] = Echo[ch].process(fWet[ch], fSampleRate, iBypassDelay, iBypassDelayMod, iBypassReverb, fModRate, fModDepth, fModDelayTime);
 
 			wetDryBlend(fOut, ch, fWet, fMix, fDry); // Apply wet/dry mix
 			fOut[ch] *= fOutputGain; // Apply output gain

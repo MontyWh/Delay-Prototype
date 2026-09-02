@@ -36,6 +36,7 @@ private:
 	// Declare shared member variables here
 
 	MyEcho Echo[2]; // Two instances of MyEcho for stereo processing
+    float fDelayEffectTimes[3];
 
     float fSampleRate;
 };
