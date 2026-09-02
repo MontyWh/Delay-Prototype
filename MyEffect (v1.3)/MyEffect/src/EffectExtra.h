@@ -426,10 +426,12 @@ public:
 		void set(float *delayTimes, float feedbackGain, float lpfCutoff, int numDelays)
 		{
 			iNumberOfDelays = numDelays;
-			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].set(delayTimes[i]);
+			for (int i = 0; i < iNumberOfDelays; i++)
+			{
+				MultipleDelays[i].set(delayTimes[i]);
+				MultipleDelays[i].setLowPassCutoff(lpfCutoff);
+			}
 			fFeedbackGain = feedbackGain;
-
-			LPF.set(lpfCutoff);
 		}
 
 		void setTapTempo(float sampleRate)
@@ -449,9 +451,15 @@ public:
 		float process(float input, float sampleRate, int bypassDelayMod, float fModRate, float fModDepth, float fModDelayTime)
 		{
 			float fSummedTaps = 0.0f;
-			for (int i = 0; i < iNumberOfDelays; i++) fSummedTaps += MultipleDelays[i].read(sampleRate, bypassDelayMod, fModRate, fModDepth, fModDelayTime); // Sum the outputs of all delay taps
+			float fSummedFilteredTaps = 0.0f;
+			for (int i = 0; i < iNumberOfDelays; i++)
+			{
+				float fTap = MultipleDelays[i].read(sampleRate, bypassDelayMod, fModRate, fModDepth, fModDelayTime); // Sum the outputs of all delay taps
+				fSummedTaps += fTap;
+				fSummedFilteredTaps += MultipleDelays[i].lowPassFilter(fTap);
+			}
 
-			float fWriteValue = input + LPF.process(fSummedTaps * fFeedbackGain);
+			float fWriteValue = input + (fSummedFilteredTaps * fFeedbackGain);
 			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].write(fWriteValue); // Write the same value to all delay taps
 
 			return fSummedTaps;
@@ -559,6 +567,16 @@ public:
 				if (fDelayTime > 2.0f) fDelayTime = 2.0f;
 			}
 
+			void setLowPassCutoff(float cutoff)
+			{
+				LPF.set(cutoff);
+			}
+
+			float lowPassFilter(float input)
+			{
+				return LPF.process(input);
+			}
+
 			void write(float input)
 			{
 				pfCircularBuffer[iBufferWritePos] = input;
@@ -594,6 +612,7 @@ public:
 
 		private:
 			float* pfCircularBuffer;
+			MyFilters::MyIirFilter::MyBiQuadFilter::MyLowPassFilter LPF;
 
 			int iTapState;
 			int iTapCount;
@@ -608,8 +627,6 @@ public:
 	private:
 		int iNumberOfDelays;
 		float fFeedbackGain;
-
-		MyFilters::MyIirFilter::MyBiQuadFilter::MyLowPassFilter LPF;
 	};
 
 	class MyReverb
