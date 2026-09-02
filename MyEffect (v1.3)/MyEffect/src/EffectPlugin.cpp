@@ -35,7 +35,7 @@ extern "C" {
 
 			{   "Mod Rate",  Parameter::ROTARY, 0.05f, 1.0f, 1.0f, AUTO_SIZE  },
 			{   "Mod Depth",  Parameter::ROTARY, 0.0f, 0.02f, 0.02f, AUTO_SIZE  },
-			{   "Mod Delay Time",  Parameter::ROTARY, 0.05f, 2.0f, 0.05f, AUTO_SIZE  },
+			{   "Mod Delay Time",  Parameter::ROTARY, 0.05f, 2.0f, 1.75f, AUTO_SIZE  },
 
 			{   "Number of Delays",  Parameter::MENU, { "1 Delay Line", "2 Delay Lines", "3 Delay Lines" }, AUTO_SIZE  },
 
@@ -104,7 +104,7 @@ void MyEffect::buttonPressed(int iButton)
 
 	if (iButton == 6)
 	{
-		for (int ch = 0; ch < 2; ch++) Echo[ch].setDelayTapTempo(fSampleRate);
+		for (int ch = 0; ch < 2; ch++) Echo[ch].Delay.setTapTempo(fSampleRate); // Set tap tempo for both channels
 	}
 }
 

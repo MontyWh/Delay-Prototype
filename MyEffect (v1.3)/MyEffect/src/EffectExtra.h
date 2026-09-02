@@ -392,11 +392,6 @@ public:
 		Reverb.initialiseBuffer(sampleRate);
 	}
 
-	void setDelayTapTempo(float sampleRate)
-	{
-		Delay.setTapTempo(sampleRate);
-	}
-
 	void setupParameters(float* fDelayEffectTimes, float fReverbPatterns[][4], float fFeedbackGain, float fLpfCutoff, int iNumberOfDelays)
 	{
 		Delay.set(fDelayEffectTimes, fFeedbackGain, fLpfCutoff, iNumberOfDelays);
@@ -441,7 +436,7 @@ public:
 		{
 			if (MultipleDelays[0].setTapTempo(sampleRate))
 			{
-				float fTapTime = MultipleDelays[0].getDelayTime();
+				float fTapTime = MultipleDelays[0].fDelayTime;
 				for (int i = 1; i < iNumberOfDelays; i++) MultipleDelays[i].setTappedDelayTime(fTapTime / pow(2.0f, (float)i));
 			}
 		}
@@ -543,9 +538,9 @@ public:
 			float read(float sampleRate, float fModRate, float fModDepth, float fModDelayTime)
 			{
 				Mod.setupValues(fModRate);
-				float z = Mod.processOffset(fModDepth, 1);
-				float fModulatedDelayTime = fModDelayTime + z;
-				float fOutputDelayTime = fDelayTime + fModulatedDelayTime;
+				float fDelayOffset = Mod.processOffset(fModDepth, 1); // Get the modulation offset for the delay time
+				fModDelayTime = fModDelayTime + fDelayOffset;
+				float fOutputDelayTime = fDelayTime + fModDelayTime;
 				if (fOutputDelayTime < 0.001f) fOutputDelayTime = 0.001f;
 				if (fOutputDelayTime > 2.0f) fOutputDelayTime = 2.0f;
 				int readPos = iBufferWritePos - (int)(sampleRate * fOutputDelayTime); // Calculate the read position based on the delay time
@@ -553,11 +548,6 @@ public:
 
 				Mod.postProcess();
 				return pfCircularBuffer[readPos];
-			}
-
-			float getDelayTime()
-			{
-				return fDelayTime;
 			}
 
 			void setTappedDelayTime(float delayTime)
@@ -596,9 +586,9 @@ public:
 
 			int iBufferWritePos;
 			int iBufferSize;
+			float fDelayTime;
 
 		private:
-			float fDelayTime;
 			float fManualDelayTime;
 			float* pfCircularBuffer;
 
@@ -664,7 +654,8 @@ public:
 		int iNumberOfDelayGroups = 0;
 	};
 
+	MyEcho::MyMultiLineDelay Delay;
+	MyEcho::MyReverb Reverb;
+
 	private:
-		MyEcho::MyMultiLineDelay Delay;
-		MyEcho::MyReverb Reverb;
 };
