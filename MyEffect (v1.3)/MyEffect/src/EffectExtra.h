@@ -7,6 +7,411 @@
 
 #pragma once
 
+class MyNoiseGate
+{
+public:
+
+	float noiseGate(float input, float threshold, float fReduction)
+	{
+		noiseGateFilter.tick(input);
+
+		bool bMeterCounterCondition = false;
+
+
+		// Define the input range (1 to 40)
+		float fRangeMin = 1.0;
+		float fRangeMax = 40.0;
+
+		if (bMeterCounterCondition == true)
+		{
+			// test and cycle through fThresh
+			fMeterCounter += 0.0000025; // count up
+			threshold = fMeterCounter; // display the value
+			if (fMeterCounter > 1) fMeterCounter = 0; // reset the value
+		}
+
+		float fAbsolute = fabsf(input);
+
+		if (fPeak < fAbsolute) fPeak = fAbsolute; // did we see a louder peak?
+		iMeasuredItems++;
+
+
+		if (iMeasuredItems == iMeasuredLength)
+		{
+			//// Scale and offset the values of fMax0
+			fPeak = fRangeMin + (fPeak * (fRangeMax - fRangeMin));
+
+			// Use the log10() function to calculate log values, to give you values between log10(1) to log10(40), to then scale to the range of 0 to 1 by dividing by log10(4)
+			fPeak = log10(fPeak) / log10(40);
+
+			iMeasuredItems = fPeak = 0; // reset for next time
+		}
+
+		fGateTarget = (fPeak > threshold) ? 1 : fReduction; // should the gate open?
+		if (fGateGain < fGateTarget) // the gate is opening - 'Attack'
+		{
+			fGateGain += 0.01;
+			if (fGateGain > 1) fGateGain = 1;
+		}
+		if (fGateGain > fGateTarget) // the gate is closing - 'Release'
+		{
+			fGateGain -= 0.01;
+			if (fGateGain < fReduction) fGateGain = fReduction;
+		}
+
+		return fGateGain;
+	}
+
+	LPF noiseGateFilter;
+
+private:
+	int iMeasuredLength = static_cast<int>(getSampleRate());
+	int iMeasuredItems = 0;
+	float fPeak = 0; // initially there is no peak value
+	float fGateGain = 0; // initially the gate is closed
+	float fGateTarget = 0; // the gate is opening/closing
+
+	float fMeterCounter = 0;
+};
+
+class MyMultibandDistortion
+{
+public:
+	MyMultibandDistortion()
+	{
+		subBass.setCutoff(60.0);
+		bassUpper.setCutoff(250.0);
+		bassLower.setCutoff(60.0);
+		midUpper.setCutoff(2000.0);
+		midLower.setCutoff(250.0);
+		treble.setCutoff(2000.0);
+	}
+
+	class MyDistortionEffect
+	{
+	public:
+		class MyDistortionTypes
+		{
+		public:
+			// Function to rectify a float value
+			float rectify(float value) {
+				return (value < 0) ? -value : value;
+			}
+
+			float softClip(float input, float control)
+			{
+				float fOutput = (2 / M_PI) * atan(input * control);
+				return fOutput;
+			}
+
+			float hardClip(float input, float control)
+			{
+				input *= control;
+				if (input > 1) input = 1;
+				else if (input < -1) input = -1;
+
+				return input;
+			}
+
+			float quantisedDistortion(float input, float control)
+			{
+				// Adjust gain for MyDistortion based on threshold parameter
+				float fAdjustedGain = std::pow(10, (control * 2.5) / 20);
+
+				// Apply MyDistortion by scaling the input
+				int iQuantised = static_cast<int>(std::round(input * fAdjustedGain));
+
+				// Convert quantized integer back to floating-point
+				float fOutput = iQuantised / fAdjustedGain;
+				fOutput = hardClip(fOutput, 1.0f);
+
+				// Return the distorted signal
+				return fOutput;
+			}
+
+			float rectifiedDistortion(float input, float control)
+			{
+
+				float fOutput = rectify(input * control);
+
+				return fOutput;
+			}
+
+			float foldingDistortion(float input, float control)
+			{
+				input *= control;
+
+				while (input > 1.0f || input < -1.0f)
+				{
+					if (input > 1.0f) input = 2.0f - input;
+					else if (input < -1.0f) input = -2.0f - input;
+				}
+
+				return input;
+			}
+
+			float asymmetricDistortion(float input, float control)
+			{
+				if (input < 0) input = softClip(input, control);
+				else if (input > 0) input = hardClip(input, control);
+
+				return input;
+			}
+
+			float parabolicDistortion(float input, float control)
+			{
+				if (input < 0) input = 0 - pow(hardClip(input, control), 2);
+				else if (input > 0) input = pow(hardClip(input, control), 2);
+
+				if (input < 0) input = input;
+				else if (input > 0) input = input;
+				else input = 0;
+
+				return input;
+			}
+
+			float quarterCircleDistortion(float input, float control)
+			{
+				input *= control;
+				float fRadius = 1.0f;
+				float fInside = fRadius - pow(input, 2.0f);
+				if (fInside < 0.0f) fInside = 0.0f;
+
+				float fOutput = sqrt(fInside);
+
+				return fOutput;
+			}
+
+
+			// Lo-Fi MyDistortion types
+
+			float tangentDistortion(float input, float control)
+			{
+				// Use a non-linear function like tanh for soft clipping
+				float fOutput = std::tanh(input * control);
+
+
+				return fOutput;
+			}
+
+			float aliasingDistortion(float input, float control, int numOfSamples, float fSR)
+			{
+				// "Time-quantising" aka 'aliasing'
+
+				input *= control;
+
+				static int iSampleCounter = 0; // Keeps track of the sample count
+				static float fLastOutput = 0.0; // Holds the last fOutput sample for aliasing effect
+
+				// Calculate the downsampling factor based on the threshold parameter
+				int iDownsampleFactor = 1 + static_cast<int>(pow(control, 2.0f) * 60.0f);
+
+				// Downsample by only updating fOutput on every Nth sample, according to iDownsampleFactor
+				if (iSampleCounter % iDownsampleFactor == 0) {
+					fLastOutput = input;
+				}
+
+				// Increment sample counter and wrap it around to prevent overflow
+				iSampleCounter++;
+				if (iSampleCounter >= iDownsampleFactor) iSampleCounter = 0;
+
+				return fLastOutput;
+			}
+
+			float phaseDistortion(float input, float control, int numOfSamples, float sampleRate)
+			{
+				// Apply phase Distortion by modifying the phase of the input
+				float fPhaseShift = 20.0f + (control * 1980.0f); // Adjust the scaling factor as needed
+
+				// Calculate the fPhase increment per sample
+				float fPhaseIncrement = 2.0f * M_PI * fPhaseShift / sampleRate;
+
+				static float fPhase = 0.0f;
+				fPhase += fPhaseIncrement;
+				if (fPhase > 2.0f * M_PI) fPhase -= 2.0f * M_PI;
+
+				float fOutput = input * std::cos(fPhase);
+
+				return fOutput;
+			}
+
+			float alterBitDepth(float input, float control)
+			{
+				// Number of bits to reduce by
+				float fMaxDepth = 24 * (1 - std::pow(control, 1.0 / 4.0));
+
+				// Calculate the altered sample value
+				float fAlteredSample = round((input + 1.0) * fMaxDepth) / (fMaxDepth + 1.0);
+
+				return fAlteredSample;
+			}
+		};
+
+		float processDistortion(float input, int type, float control)
+		{
+			float fInputGain = 1.0 + (pow(control, 3.0) * (25.0 - 1.0));
+
+			// Distortion types
+
+			if (type == 1)
+			{
+				input = DistortionTypes.softClip(input, fInputGain);
+			}
+
+			else if (type == 2)
+			{
+				input = DistortionTypes.hardClip(input, fInputGain);
+			}
+
+			else if (type == 3)
+			{
+				input = DistortionTypes.quantisedDistortion(input, fInputGain);
+			}
+
+			else if (type == 4)
+			{
+				input = DistortionTypes.rectifiedDistortion(input, fInputGain);
+			}
+
+			else if (type == 5)
+			{
+				input = DistortionTypes.foldingDistortion(input, fInputGain);
+			}
+
+			else if (type == 6)
+			{
+				input = DistortionTypes.asymmetricDistortion(input, fInputGain);
+			}
+
+			else if (type == 7)
+			{
+				input = DistortionTypes.parabolicDistortion(input, fInputGain);
+			}
+
+			else if (type == 8)
+			{
+				input = DistortionTypes.quarterCircleDistortion(input, fInputGain);
+			}
+
+			return input;
+		}
+
+		MyDistortionTypes DistortionTypes;
+	};
+
+	float process(float input, float typeDistortionAmount[9], int tonalDistortionType[4])
+	{
+		float fBand[4];
+		float fBandClean[4];
+		float fTonalDistortion[4];
+
+		// Initialise bands for this channel
+		fBand[0] = subBass.tick(input);
+		fBand[1] = (bassUpper.tick(input) + bassLower.tick(input));
+		fBand[2] = (midUpper.tick(input) + midLower.tick(input));
+		fBand[3] = treble.tick(input);
+
+		// Process each band if required
+		for (int j = 0; j <= 3; j++)
+		{
+			fBandClean[j] = fBand[j];
+
+			int iCurrentType = tonalDistortionType[j];
+			if (iCurrentType < 0) iCurrentType = 0;
+			else if (iCurrentType > 8) iCurrentType = 8;
+
+			float fCurrentDistortionAmount = typeDistortionAmount[iCurrentType];
+			float fDistortedBand = DistortionEffect.processDistortion(fBand[j], iCurrentType, fCurrentDistortionAmount);
+
+			fTonalDistortion[j] = (fDistortedBand * fCurrentDistortionAmount) + ((1.0f - fCurrentDistortionAmount) * fBandClean[j]);
+		}
+
+		// Sum the processed bands
+		input = fTonalDistortion[0] + fTonalDistortion[1] + fTonalDistortion[2] + fTonalDistortion[3];
+
+		return input;
+	}
+
+private:
+	LPF subBass;
+	LPF bassLower;
+	HPF bassUpper;
+	LPF midLower;
+	HPF midUpper;
+	HPF treble;
+
+	MyDistortionEffect DistortionEffect;
+};
+
+class MySaturation
+{
+public:
+	float vinylCrackle(float input, int numOfSamples, float loFiBlend, int counter, float sampleRate)
+	{
+		int randomNumber = rand() % 200 + 1;     // in the range 1 to fRangeMin
+
+		float fInputDip = input * 0.5;
+
+		if (numOfSamples == randomNumber)
+		{
+			if (randomNumber == 0)
+				input = 0 + (randomNumber / 100);
+
+			else if (randomNumber == 1)
+				input = DistortionTypes.hardClip(input * (1.0 + loFiBlend), 1.0);
+
+			else if (randomNumber == 2)
+			{
+				input = DistortionTypes.alterBitDepth(fInputDip, loFiBlend);
+			}
+			else if (randomNumber == 3)
+			{
+				input = DistortionTypes.aliasingDistortion(fInputDip, loFiBlend, numOfSamples, sampleRate);
+			}
+			else if (randomNumber == 4)
+			{
+				input = DistortionTypes.phaseDistortion(fInputDip, loFiBlend, numOfSamples, sampleRate);
+			}
+		}
+		input = DistortionTypes.alterBitDepth(input, 0.0625 * loFiBlend);
+
+		return input;
+	}
+
+
+	float loFiEffects(float input, int type, float loFiBlend, int numOfSamples, float sampleRate)
+	{
+		float output = input;
+		if (type == 1)
+		{
+			output = DistortionTypes.tangentDistortion(input, loFiBlend);
+		}
+		else if (type == 2)
+		{
+			output = DistortionTypes.aliasingDistortion(input, loFiBlend, numOfSamples, sampleRate);
+		}
+		else if (type == 3)
+		{
+			output = DistortionTypes.phaseDistortion(input, loFiBlend, numOfSamples, sampleRate);
+		}
+		else if (type == 4)
+		{
+			output = DistortionTypes.alterBitDepth(input, loFiBlend);
+		}
+		else if (type == 5)
+		{
+			output = vinylCrackle(input, numOfSamples, loFiBlend, vinylCounter, sampleRate);
+		}
+
+		output = (output * loFiBlend) + ((1.0f - loFiBlend) * input);
+
+		return output;
+	}
+
+	float vinylCounter = 0;
+	MyMultibandDistortion::MyDistortionEffect::MyDistortionTypes DistortionTypes;
+};
+
 class MyModulator
 {
 public:
@@ -539,6 +944,11 @@ public:
 				return false;
 			}
 
+			float distortEcho(float input, float drive, float distortionBlend)
+			{
+				float fDistortion = Distortion.softClip(input, drive);
+			}
+
 			float read(float sampleRate, int bypassDelayMod, float fModRate, float fModDepth, float fModDelayTime)
 			{
 				if (bypassDelayMod == 0)
@@ -617,6 +1027,8 @@ public:
 			float fTapPulseMultiplier = 1.0f;
 
 			MyModulator Mod;
+
+			MyMultibandDistortion::MyDistortionEffect::MyDistortionTypes Distortion;
 		};
 
 		MyDelay MultipleDelays[3];
