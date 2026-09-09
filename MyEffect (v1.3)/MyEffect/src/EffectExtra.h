@@ -857,7 +857,7 @@ public:
 			for (int i = 0; i < 3; i++) MultipleDelays[i].initialiseBuffer(sampleRate);
 
 			fDriveEnvelope = 0.0f;
-			fDriveDecayPerSample = (sampleRate > 0.0f) ? pow(0.001f, 1.0f / (sampleRate * 1.5f)) : 1.0f;
+			fDriveDecayPerSample = (sampleRate > 0.0f) ? pow(0.001f, 1.0f / (sampleRate * 1.5f)) : 1.0f; // Decay over 1.5 seconds
 		}
 
 		float process(float input, float sampleRate, int bypassDelayMod, float modRate, float modDepth, float modDelayTime, float drive)
@@ -1046,46 +1046,157 @@ public:
 	class MyReverb
 	{
 	public:
+		MyReverb()
+		{
+			for (int i = 0; i < 4; i++)
+			{
+				pfEchoBlockBuffers[i] = nullptr;
+				iEchoBlockWritePos[i] = 0;
+				iEchoBlockPreDelaySamples[i] = 1;
+			}
+		}
+
+		~MyReverb()
+		{
+			for (int i = 0; i < 4; i++) delete[] pfEchoBlockBuffers[i];
+		}
+
+		class MyEchoBlock
+		{
+		public:
+
+			void initialiseBuffer(float sampleRate)
+			{
+				for (int i = 0; i < 3; i++)
+					for (int j = 0; j < 4; j++) Delays[i][j].initialiseBuffer(sampleRate);
+			}
+
+			void set(float delayTimes[][4], float feedbackGain, float lpfCutoff, float drive, int numDelays)
+			{
+				iNumberOfDelayGroups = numDelays;
+				if (iNumberOfDelayGroups < 1) iNumberOfDelayGroups = 1;
+				if (iNumberOfDelayGroups > 3) iNumberOfDelayGroups = 3;
+
+				for (int i = 0; i < iNumberOfDelayGroups; i++)
+				{
+					for (int j = 0; j < 4; j++)
+					{
+						float fDelayLineTimes[3];
+						for (int k = 0; k < 3; k++)
+						{
+							int iTapIndex = (j + k) % 4;
+							fDelayLineTimes[k] = delayTimes[i][iTapIndex];
+						}
+						Delays[i][j].set(fDelayLineTimes, feedbackGain, lpfCutoff, drive, 3);
+					}
+				}
+			}
+
+			int tapPos(int delayIndex, float time, float sampleRate)
+			{
+				int iDelayGroup = delayIndex / 4;
+				int iDelayGroupTarget = delayIndex % 4;
+				int iBufferReadPos = Delays[iDelayGroup][iDelayGroupTarget].MultipleDelays[0].iBufferWritePos - (time * sampleRate); // Calculate the read position based on the delay time
+				if (iBufferReadPos < 0) iBufferReadPos += Delays[iDelayGroup][iDelayGroupTarget].MultipleDelays[0].iBufferSize; // Wrap around if necessary
+				return iBufferReadPos;
+			}
+
+			float process(float input, float sampleRate, float drive)
+			{
+				float fSummedTaps = 0.0f;
+				for (int i = 0; i < iNumberOfDelayGroups; i++)
+					for (int j = 0; j < 4; j++) fSummedTaps += Delays[i][j].process(input, sampleRate, 0, 0.0f, 0.0f, 0.0f, drive);
+				return fSummedTaps;
+			}
+
+			void postProcess()
+			{
+				for (int i = 0; i < iNumberOfDelayGroups; i++)
+					for (int j = 0; j < 4; j++) Delays[i][j].postProcess();
+			}
+
+			MyMultiLineDelay Delays[3][4];
+
+		private:
+			int iNumberOfDelayGroups = 0;
+		};
+
 		void initialiseBuffer(float sampleRate)
 		{
-			for (int i = 0; i < 3; i++)
-				for (int j = 0; j < 4; j++) Delays[i][j].initialiseBuffer(sampleRate);
+			for (int i = 0; i < 4; i++) EchoBlocks[i].initialiseBuffer(sampleRate);
+
+			iEchoBlockBufferSize = (int)(sampleRate * 2.0f);
+			if (iEchoBlockBufferSize < 1) iEchoBlockBufferSize = 1;
+
+			for (int i = 0; i < 4; i++)
+			{
+				delete[] pfEchoBlockBuffers[i];
+				pfEchoBlockBuffers[i] = new float[iEchoBlockBufferSize];
+				for (int j = 0; j < iEchoBlockBufferSize; j++) pfEchoBlockBuffers[i][j] = 0.0f;
+
+				iEchoBlockWritePos[i] = 0;
+				iEchoBlockPreDelaySamples[i] = (int)(sampleRate * (0.004f * (float)(i + 1))); // 4,8,12,16ms
+				if (iEchoBlockPreDelaySamples[i] < 1) iEchoBlockPreDelaySamples[i] = 1;
+				if (iEchoBlockPreDelaySamples[i] >= iEchoBlockBufferSize) iEchoBlockPreDelaySamples[i] = iEchoBlockBufferSize - 1;
+			}
 		}
 
-		void set(float delayTimes[][4], float feedbackGain, float lpfCutoff, float drive, int numDelays)
+		void set(float reverbPatterns[][4], float feedbackGain, float lpfCutoff, float drive, int numDelays)
 		{
-			iNumberOfDelayGroups = numDelays;
-			for (int i = 0; i < iNumberOfDelayGroups; i++)
-				for (int j = 0; j < 4; j++) Delays[i][j].set(&delayTimes[i][j], feedbackGain, lpfCutoff, drive, 3);
-		}
-
-		int tapPos(int delayIndex, float time, float sampleRate)
-		{
-			int iDelayGroup = delayIndex / 4;
-			int iDelayGroupTarget = delayIndex % 4;
-			int iBufferReadPos = Delays[iDelayGroup][iDelayGroupTarget].MultipleDelays[0].iBufferWritePos - (time * sampleRate); // Calculate the read position based on the delay time
-			if (iBufferReadPos < 0) iBufferReadPos += Delays[iDelayGroup][iDelayGroupTarget].MultipleDelays[0].iBufferSize; // Wrap around if necessary
-			return iBufferReadPos;
+			const float fBlockMultipliers[4] = { 1.00f, 1.13f, 0.91f, 1.27f };
+			for (int i = 0; i < 4; i++)
+			{
+				float fOffsetPatterns[3][4];
+				for (int j = 0; j < 3; j++)
+				{
+					for (int k = 0; k < 4; k++)
+					{
+						float fTapJitter = 0.0015f * (float)(k + 1);
+						if (i % 2 == 1) fTapJitter = -fTapJitter;
+						float fOffsetTime = (reverbPatterns[j][k] * fBlockMultipliers[i]) + fTapJitter;
+						if (fOffsetTime < 0.001f) fOffsetTime = 0.001f;
+						if (fOffsetTime > 2.0f) fOffsetTime = 2.0f;
+						fOffsetPatterns[j][k] = fOffsetTime;
+					}
+				}
+				EchoBlocks[i].set(fOffsetPatterns, feedbackGain, lpfCutoff, drive, numDelays);
+			}
 		}
 
 		float process(float input, float sampleRate, float drive)
 		{
-			float fSummedTaps = 0.0f;
-			for (int i = 0; i < iNumberOfDelayGroups; i++)
-				for (int j = 0; j < 4; j++) fSummedTaps += Delays[i][j].process(input, sampleRate, 0, 0.0f, 0.0f, 0.0f, drive);
-			return fSummedTaps;
+			float fSummedEchoBlocks = 0.0f;
+			for (int i = 0; i < 4; i++)
+			{
+				float fBlockInput = input;
+				if (pfEchoBlockBuffers[i] != nullptr && iEchoBlockBufferSize > 1)
+				{
+					int iReadPos = iEchoBlockWritePos[i] - iEchoBlockPreDelaySamples[i];
+					if (iReadPos < 0) iReadPos += iEchoBlockBufferSize;
+
+					fBlockInput = pfEchoBlockBuffers[i][iReadPos];
+					pfEchoBlockBuffers[i][iEchoBlockWritePos[i]] = input;
+
+					iEchoBlockWritePos[i]++;
+					if (iEchoBlockWritePos[i] >= iEchoBlockBufferSize) iEchoBlockWritePos[i] = 0;
+				}
+
+				fSummedEchoBlocks += EchoBlocks[i].process(fBlockInput, sampleRate, drive);
+			}
+			return fSummedEchoBlocks;
 		}
 
 		void postProcess()
 		{
-			for (int i = 0; i < iNumberOfDelayGroups; i++)
-				for (int j = 0; j < 4; j++) Delays[i][j].postProcess();
+			for (int i = 0; i < 4; i++) EchoBlocks[i].postProcess();
 		}
 
-		MyMultiLineDelay Delays[3][4];
-
 	private:
-		int iNumberOfDelayGroups = 0;
+		MyEchoBlock EchoBlocks[4];
+		float* pfEchoBlockBuffers[4];
+		int iEchoBlockBufferSize = 0;
+		int iEchoBlockWritePos[4];
+		int iEchoBlockPreDelaySamples[4];
 	};
 
 	MyEcho::MyMultiLineDelay Delay;
