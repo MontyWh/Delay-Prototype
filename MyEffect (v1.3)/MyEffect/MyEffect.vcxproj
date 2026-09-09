@@ -103,7 +103,6 @@
     <ClInclude Include="include\stk\Wurley.h" />
     <ClInclude Include="include\stk\WvIn.h" />
     <ClInclude Include="include\stk\WvOut.h" />
-    <ClInclude Include="src\EffectExtra.h" />
     <ClInclude Include="src\EffectPlugin.h" />
   </ItemGroup>
   <ItemGroup>

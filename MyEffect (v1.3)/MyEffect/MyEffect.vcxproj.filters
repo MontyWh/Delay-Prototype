@@ -23,9 +23,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\EffectExtra.h">
-      <Filter>Source Code</Filter>
-    </ClInclude>
     <ClInclude Include="src\EffectPlugin.h">
       <Filter>Source Code</Filter>
     </ClInclude>

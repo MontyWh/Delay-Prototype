@@ -13,3 +13,4 @@
 - User prefers using `pow(x, y)` style expressions instead of bit-shift expressions for delay-time divisor calculations.
 - User prefers requested function creation without automatic wiring/linking into processing flow; they will connect it manually.
 - User wants tempo mode delay times to remain flexible/user-adjustable and not be fixed in place by tap tempo or continuous parameter overwrites.
+- Never delete files as a workaround for edit conflicts. Always exhaust careful surgical edits first—split the problematic change into smaller, unique replaces; use git to understand what went wrong; or ask for clarification. Deleting and restoring from git should be an absolute last resort only after confirming no other option works, especially for large files with complex structure where the cost of loss is high.

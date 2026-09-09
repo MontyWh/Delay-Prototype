@@ -49,7 +49,7 @@ extern "C" {
 			{   "Delay Time 2",  Parameter::ROTARY, 0.001f, 0.1f, 0.05f, AUTO_SIZE  },
 			{   "Delay Time 3",  Parameter::ROTARY, 0.001f, 0.1f, 0.075f, AUTO_SIZE  },
 
-            {   "Delay Feedback Gain",  Parameter::ROTARY, 0.0f, 0.25f, 0.125f, AUTO_SIZE  },
+			{   "Delay Feedback Gain",  Parameter::ROTARY, 0.0f, 0.25f, 0.125f, AUTO_SIZE  },
 
 			{	"LPF Cutoff",  Parameter::ROTARY, 0.0f, 1.0f, 1.0f, AUTO_SIZE },
 			{   "Delay Drive",  Parameter::ROTARY, 1.0f, 4.5f, 1.0f, AUTO_SIZE  },
@@ -60,12 +60,13 @@ extern "C" {
 
 			{   "Mix",  Parameter::ROTARY, 0.0f, 100.0f, 50.0f, AUTO_SIZE  },
 			{   "Output Gain",  Parameter::SLIDER, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
+			{   "Stereo Width",  Parameter::ROTARY, 0.0f, 1.0f, 0.1f, AUTO_SIZE  },
         };
 
         const Presets PRESETS = {
-            { "Preset 1", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { "Preset 2", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { "Preset 3", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { "Preset 1", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { "Preset 2", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { "Preset 3", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
         };
 
         return (APDI::Effect*)new MyEffect(CONTROLS, PRESETS);
@@ -77,12 +78,8 @@ MyEffect::MyEffect(const Parameters& parameters, const Presets& presets)
 : Effect(parameters, presets)
 {
 	// Initialise member variables, etc.
-	for (int ch = 0; ch < 2; ch++)
-	{
-		Echo[ch].initialise(getSampleRate());
-
-		fSampleRate = getSampleRate();
-	}
+	Echo.initialise(getSampleRate());
+	fSampleRate = getSampleRate();
 }
 
 // Destructor: called when the effect is terminated / unloaded
@@ -110,13 +107,14 @@ void MyEffect::buttonPressed(int iButton)
 
 	if (iButton == 9)
 	{
-		for (int ch = 0; ch < 2; ch++) Echo[ch].Delay.setTapTempo(fSampleRate); // Set tap tempo for both channels
+		Echo.Echo[0].Delay.setTapTempo(fSampleRate); // Set tap tempo for both channels
+		Echo.Echo[1].Delay.setTapTempo(fSampleRate);
 
 		int iNumberOfDelays = parameters[6] + 1;
 		if (iNumberOfDelays > 3) iNumberOfDelays = 3;
 		for (int i = 0; i < iNumberOfDelays; i++)
 		{
-			float fUiDelayTime = Echo[0].Delay.MultipleDelays[i].fDelayTime / 10.0f;
+			float fUiDelayTime = Echo.Echo[0].Delay.MultipleDelays[i].fDelayTime / 10.0f;
 			if (fUiDelayTime < 0.001f) fUiDelayTime = 0.001f;
 			if (fUiDelayTime > 0.1f) fUiDelayTime = 0.1f;
 			parameters[10 + i] = fUiDelayTime;
@@ -213,32 +211,31 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 	float fMix = parameters[19] / 100.0f; // Convert from 0-100 to 0-1
 	float fOutputGain = parameters[20];
+	float fStereoWidth = parameters[21]; // 0.0-1.0 cross-channel width
 
-	// Set delay parameters for all channels
-	for (int ch = 0; ch < 2; ch++)
-	{
-		Echo[ch].setupParameters(fDelayEffectTimes, fReverbPatterns, fFeedbackGain, fLpfCutoff, fDelayDrive, fDiffusion, iNumberOfDelays);
-	}
+	// Set delay parameters for both channels
+	Echo.setupParameters(fDelayEffectTimes, fReverbPatterns, fFeedbackGain, fLpfCutoff, fDelayDrive, fDiffusion, iNumberOfDelays);
 
 	while (numSamples--)
 	{
+		// Get sample from input
+		fIn[0] = *pfInBuffer[0]++;
+		fIn[1] = *pfInBuffer[1]++;
+
+		float fDry[2], fWet[2];
+		for (int ch = 0; ch < 2; ch++) fWet[ch] = fDry[ch] = fIn[ch];
+
+		Echo.processStereo(fDry[0], fDry[1], fSampleRate, iBypassDelay, iBypassDelayMod, iBypassReverb, fModRate, fModDepth, fModDelayTime, fDelayDrive, fStereoWidth, fWet[0], fWet[1]);
+
 		for (int ch = 0; ch < 2; ch++)
 		{
-			// Get sample from input
-			fIn[ch] = *pfInBuffer[ch]++;
-
-			float fDry[2], fWet[2];
-			fWet[ch] = fDry[ch] = fIn[ch];
-
-			fWet[ch] = Echo[ch].process(fWet[ch], fSampleRate, iBypassDelay, iBypassDelayMod, iBypassReverb, fModRate, fModDepth, fModDelayTime, fDelayDrive);
-
 			wetDryBlend(fOut, ch, fWet, fMix, fDry); // Apply wet/dry mix
 			fOut[ch] *= fOutputGain; // Apply output gain
 
 			// Copy result to output
 			*pfOutBuffer[ch]++ = fOut[ch];
-
-			Echo[ch].postProcess();
 		}
+
+		Echo.postProcess();
 	}
 }

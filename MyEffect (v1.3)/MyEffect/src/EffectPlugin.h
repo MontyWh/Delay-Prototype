@@ -38,7 +38,7 @@ private:
 
     float updateTempoDivisions(int tempoBpm, float tempoOrTime, float delayTime);
 
-	MyEcho Echo[2]; // Two instances of MyEcho for stereo processing
+	MyEcho::MyEcho
 	float fDelayEffectTimes[3];
 
 	float fSampleRate;
