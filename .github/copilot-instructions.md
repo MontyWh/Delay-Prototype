@@ -11,3 +11,5 @@
 - User prefers tap-tempo state tracking with iTapState[2] representing old/new button states for edge detection.
 - User prefers tap tempo to scale/relate existing delayTimes via coefficients, preserving manual delay-time controls alongside tap tempo.
 - User prefers using `pow(x, y)` style expressions instead of bit-shift expressions for delay-time divisor calculations.
+- User prefers requested function creation without automatic wiring/linking into processing flow; they will connect it manually.
+- User wants tempo mode delay times to remain flexible/user-adjustable and not be fixed in place by tap tempo or continuous parameter overwrites.

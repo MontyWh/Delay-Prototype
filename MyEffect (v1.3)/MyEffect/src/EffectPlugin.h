@@ -12,6 +12,7 @@
 #include "apdi/Plugin.h"
 #include "apdi/Helpers.h"
 using namespace APDI;
+#include <cmath>
 
 #include "EffectExtra.h"
 
@@ -35,8 +36,12 @@ public:
 private:
 	// Declare shared member variables here
 
-	MyEcho Echo[2]; // Two instances of MyEcho for stereo processing
-    float fDelayEffectTimes[3];
+    float updateTempoDivisions(int tempoBpm, float tempoOrTime, float delayTime);
 
-    float fSampleRate;
+	MyEcho Echo[2]; // Two instances of MyEcho for stereo processing
+	float fDelayEffectTimes[3];
+
+	float fSampleRate;
+
+	float fCrotchet, fQuaver, fSemiQuaver;
 };

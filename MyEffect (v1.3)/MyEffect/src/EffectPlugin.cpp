@@ -32,7 +32,6 @@ extern "C" {
 			{   "Input Gain",  Parameter::SLIDER, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
 
 			{   "Bypass Delay",  Parameter::TOGGLE, 0, 1, 1, AUTO_SIZE  },
-
 			{   "Bypass Delay Modulation",  Parameter::TOGGLE, 0, 1, 1, AUTO_SIZE  },
 			
 			{   "Mod Rate",  Parameter::ROTARY, 0.05f, 1.0f, 0.0f, AUTO_SIZE  },
@@ -40,6 +39,9 @@ extern "C" {
 			{   "Mod Delay Time",  Parameter::ROTARY, 0.05f, 2.0f, 0.05f, AUTO_SIZE  },
 
 			{   "Number of Delays",  Parameter::MENU, { "1 Delay Line", "2 Delay Lines", "3 Delay Lines" }, AUTO_SIZE  },
+
+			{	"Tempo/Time",  Parameter::TOGGLE, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
+			{	"Tempo (BPM)",  Parameter::ROTARY, int(30), int(240), int(100), AUTO_SIZE  },
 
 			{   "Tap Tempo",  Parameter::BUTTON, 0, 1, 0, AUTO_SIZE  },
 
@@ -54,15 +56,16 @@ extern "C" {
 
 			{   "Bypass Reverb",  Parameter::TOGGLE, 0, 1, 1, AUTO_SIZE  },			
 			{   "Reverb Master Time",  Parameter::ROTARY, 0.01f, 0.4f, 0.4f, AUTO_SIZE  },
+			{   "Diffusion",  Parameter::ROTARY, 0.0f, 1.0f, 0.65f, AUTO_SIZE  },
 
 			{   "Mix",  Parameter::ROTARY, 0.0f, 100.0f, 50.0f, AUTO_SIZE  },
 			{   "Output Gain",  Parameter::SLIDER, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
         };
 
         const Presets PRESETS = {
-            { "Preset 1", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { "Preset 2", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { "Preset 3", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { "Preset 1", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { "Preset 2", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { "Preset 3", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
         };
 
         return (APDI::Effect*)new MyEffect(CONTROLS, PRESETS);
@@ -105,7 +108,7 @@ void MyEffect::buttonPressed(int iButton)
 {
 	// A button, with index iButton, has been pressed
 
-	if (iButton == 7)
+	if (iButton == 9)
 	{
 		for (int ch = 0; ch < 2; ch++) Echo[ch].Delay.setTapTempo(fSampleRate); // Set tap tempo for both channels
 
@@ -116,7 +119,7 @@ void MyEffect::buttonPressed(int iButton)
 			float fUiDelayTime = Echo[0].Delay.MultipleDelays[i].fDelayTime / 10.0f;
 			if (fUiDelayTime < 0.001f) fUiDelayTime = 0.001f;
 			if (fUiDelayTime > 0.1f) fUiDelayTime = 0.1f;
-			parameters[8 + i] = fUiDelayTime;
+			parameters[10 + i] = fUiDelayTime;
 		}
 	}
 }
@@ -124,6 +127,40 @@ void MyEffect::buttonPressed(int iButton)
 void MyEffect::wetDryBlend(float  output[2], int channel, float  wet[2], float wetDryBlend, float  dry[2])
 {
 	output[channel] = wet[channel] * wetDryBlend + dry[channel] * (1.0f - wetDryBlend); // Apply mix
+}
+
+float MyEffect::updateTempoDivisions(int tempoBpm, float tempoOrTime, float delayTime)
+{
+	float fQuantisedDelayTime = delayTime;
+
+	if (tempoOrTime == 0.0f)
+	{
+		fCrotchet = (60.0f / tempoBpm) / 10.0f;
+		fQuaver = fCrotchet * 0.5f;
+		fSemiQuaver = fQuaver * 0.5f;
+
+		float fCrotchetDiff = fabsf(delayTime - fCrotchet);
+		float fQuaverDiff = fabsf(delayTime - fQuaver);
+		float fSemiQuaverDiff = fabsf(delayTime - fSemiQuaver);
+
+		if (fCrotchetDiff <= fQuaverDiff && fCrotchetDiff <= fSemiQuaverDiff)
+		{
+			fQuantisedDelayTime = fCrotchet;
+		}
+		else if (fQuaverDiff <= fSemiQuaverDiff)
+		{
+			fQuantisedDelayTime = fQuaver;
+		}
+		else
+		{
+			fQuantisedDelayTime = fSemiQuaver;
+		}
+	}
+
+	if (fQuantisedDelayTime < 0.001f) fQuantisedDelayTime = 0.001f;
+	if (fQuantisedDelayTime > 0.1f) fQuantisedDelayTime = 0.1f;
+
+	return fQuantisedDelayTime;
 }
 
 // Applies audio processing to a buffer of audio
@@ -146,13 +183,19 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 	int iNumberOfDelays = parameters[6] + 1;  // MENU exports 0, 1, 2 but we need 1, 2, 3
 
-	for (int i = 0; i < 3; i++) fDelayEffectTimes[i] = parameters[8 + i] * 10.0f;
+	float fTempoOrTime = parameters[7];  // 0 = tempo, 1 = time
+	float fTempoBpm = parameters[8];
 
-	float fFeedbackGain = parameters[11];
-	float fLpfCutoff = (20.0f + (pow(parameters[12], 3.0f) * (20000.0f - 20.0f))) / fSampleRate;
-	float fDelayDrive = parameters[13];
+	for (int i = 0; i < 3; i++)
+	{
+		fDelayEffectTimes[i] = 10.0f * updateTempoDivisions(fTempoBpm, fTempoOrTime, parameters[10 + i]);
+	}
 
-	float iBypassReverb = parameters[14];  // 0 = off, 1 = on
+	float fFeedbackGain = parameters[13];
+	float fLpfCutoff = (20.0f + (pow(parameters[14], 3.0f) * (20000.0f - 20.0f))) / fSampleRate;
+	float fDelayDrive = parameters[15];
+
+	float iBypassReverb = parameters[16];  // 0 = off, 1 = on
 
 	float fReverbPatterns[3][4];
 	float fReverbEffectTimes[4];
@@ -164,16 +207,17 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 	for (int i = 0; i < 3; i++)
 	{
-		for (int j = 0; j < 4; j++) fReverbEffectTimes[j] = fReverbPatterns[i][j] = parameters[15] * fReverbEffectTimeCoeffs[i][j];
+		for (int j = 0; j < 4; j++) fReverbEffectTimes[j] = fReverbPatterns[i][j] = parameters[17] * fReverbEffectTimeCoeffs[i][j];
 	}
+	float fDiffusion = parameters[18];
 
-	float fMix = parameters[16] / 100.0f; // Convert from 0-100 to 0-1
-	float fOutputGain = parameters[17];
+	float fMix = parameters[19] / 100.0f; // Convert from 0-100 to 0-1
+	float fOutputGain = parameters[20];
 
 	// Set delay parameters for all channels
 	for (int ch = 0; ch < 2; ch++)
 	{
-		Echo[ch].setupParameters(fDelayEffectTimes, fReverbPatterns, fFeedbackGain, fLpfCutoff, fDelayDrive, iNumberOfDelays);
+		Echo[ch].setupParameters(fDelayEffectTimes, fReverbPatterns, fFeedbackGain, fLpfCutoff, fDelayDrive, fDiffusion, iNumberOfDelays);
 	}
 
 	while (numSamples--)

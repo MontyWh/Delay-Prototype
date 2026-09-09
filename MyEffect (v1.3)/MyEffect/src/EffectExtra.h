@@ -797,10 +797,10 @@ public:
 		Reverb.initialiseBuffer(sampleRate);
 	}
 
-	void setupParameters(float* fDelayEffectTimes, float fReverbPatterns[][4], float fFeedbackGain, float fLpfCutoff, float fDrive, int iNumberOfDelays)
+	void setupParameters(float* fDelayEffectTimes, float fReverbPatterns[][4], float fFeedbackGain, float fLpfCutoff, float fDrive, float fDiffusion, int iNumberOfDelays)
 	{
 		Delay.set(fDelayEffectTimes, fFeedbackGain, fLpfCutoff, fDrive, iNumberOfDelays);
-		Reverb.set(fReverbPatterns, fFeedbackGain, fLpfCutoff, fDrive, iNumberOfDelays);
+		Reverb.set(fReverbPatterns, fFeedbackGain, fLpfCutoff, fDrive, fDiffusion, iNumberOfDelays);
 	}
 
 	float process(float input, float sampleRate, int bypassDelay, int bypassDelayMod, int bypassReverb, float modRate, float modDepth, float modDelayTime, float drive)
@@ -1141,8 +1141,11 @@ public:
 			}
 		}
 
-		void set(float reverbPatterns[][4], float feedbackGain, float lpfCutoff, float drive, int numDelays)
+		void set(float reverbPatterns[][4], float feedbackGain, float lpfCutoff, float drive, float diffusion, int numDelays)
 		{
+			if (diffusion < 0.0f) diffusion = 0.0f;
+			if (diffusion > 1.0f) diffusion = 1.0f;
+
 			const float fBlockMultipliers[4] = { 1.00f, 1.13f, 0.91f, 1.27f };
 			for (int i = 0; i < 4; i++)
 			{
@@ -1151,9 +1154,12 @@ public:
 				{
 					for (int k = 0; k < 4; k++)
 					{
-						float fTapJitter = 0.0015f * (float)(k + 1);
+						float fJitterAmount = 0.0001f + (0.0014f * diffusion);
+						float fTapJitter = fJitterAmount * (float)(k + 1);
 						if (i % 2 == 1) fTapJitter = -fTapJitter;
-						float fOffsetTime = (reverbPatterns[j][k] * fBlockMultipliers[i]) + fTapJitter;
+
+						float fScaledMultiplier = 1.0f + ((fBlockMultipliers[i] - 1.0f) * diffusion);
+						float fOffsetTime = (reverbPatterns[j][k] * fScaledMultiplier) + fTapJitter;
 						if (fOffsetTime < 0.001f) fOffsetTime = 0.001f;
 						if (fOffsetTime > 2.0f) fOffsetTime = 2.0f;
 						fOffsetPatterns[j][k] = fOffsetTime;
