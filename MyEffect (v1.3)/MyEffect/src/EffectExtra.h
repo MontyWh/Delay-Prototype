@@ -797,16 +797,16 @@ public:
 		Reverb.initialiseBuffer(sampleRate);
 	}
 
-	void setupParameters(float* fDelayEffectTimes, float fReverbPatterns[][4], float fFeedbackGain, float fLpfCutoff, int iNumberOfDelays)
+	void setupParameters(float* fDelayEffectTimes, float fReverbPatterns[][4], float fFeedbackGain, float fLpfCutoff, float fDrive, int iNumberOfDelays)
 	{
-		Delay.set(fDelayEffectTimes, fFeedbackGain, fLpfCutoff, iNumberOfDelays);
-		Reverb.set(fReverbPatterns, fFeedbackGain, fLpfCutoff, iNumberOfDelays);
+		Delay.set(fDelayEffectTimes, fFeedbackGain, fLpfCutoff, fDrive, iNumberOfDelays);
+		Reverb.set(fReverbPatterns, fFeedbackGain, fLpfCutoff, fDrive, iNumberOfDelays);
 	}
 
-	float process(float input, float sampleRate, int bypassDelay, int bypassDelayMod, int bypassReverb, float fModRate, float fModDepth, float fModDelayTime)
+	float process(float input, float sampleRate, int bypassDelay, int bypassDelayMod, int bypassReverb, float modRate, float modDepth, float modDelayTime, float drive)
 	{
-		if (bypassDelay == 0) input = Delay.process(input, sampleRate, bypassDelayMod, fModRate, fModDepth, fModDelayTime);
-		if (bypassReverb == 0) input = Reverb.process(input, sampleRate);
+		if (bypassDelay == 0) input = Delay.process(input, sampleRate, bypassDelayMod, modRate, modDepth, modDelayTime, drive);
+		if (bypassReverb == 0) input = Reverb.process(input, sampleRate, drive);
 
 		return input;
 	}
@@ -825,10 +825,13 @@ public:
 		MyMultiLineDelay()
 		{
 			fFeedbackGain = 0.0f;
+			fDrive = 1.0f;
+			fDriveEnvelope = 0.0f;
+			fDriveDecayPerSample = 1.0f;
 			iNumberOfDelays = 1;
 		}
 
-		void set(float *delayTimes, float feedbackGain, float lpfCutoff, int numDelays)
+		void set(float *delayTimes, float feedbackGain, float lpfCutoff, float drive, int numDelays)
 		{
 			iNumberOfDelays = numDelays;
 			for (int i = 0; i < iNumberOfDelays; i++)
@@ -837,6 +840,7 @@ public:
 				MultipleDelays[i].setLowPassCutoff(lpfCutoff);
 			}
 			fFeedbackGain = feedbackGain;
+			fDrive = drive;
 		}
 
 		void setTapTempo(float sampleRate)
@@ -851,18 +855,25 @@ public:
 		void initialiseBuffer(float sampleRate)
 		{
 			for (int i = 0; i < 3; i++) MultipleDelays[i].initialiseBuffer(sampleRate);
+
+			fDriveEnvelope = 0.0f;
+			fDriveDecayPerSample = (sampleRate > 0.0f) ? pow(0.001f, 1.0f / (sampleRate * 1.5f)) : 1.0f;
 		}
 
-		float process(float input, float sampleRate, int bypassDelayMod, float fModRate, float fModDepth, float fModDelayTime)
+		float process(float input, float sampleRate, int bypassDelayMod, float modRate, float modDepth, float modDelayTime, float drive)
 		{
+			fDriveEnvelope *= fDriveDecayPerSample;
+			if (fabsf(input) > 0.001f && fDriveEnvelope < 1.0f) fDriveEnvelope = 1.0f;
+			float fDriveOverTime = 1.0f + ((drive - 1.0f) * fDriveEnvelope);
+
 			float fSummedFilteredTaps = 0.0f;
 			for (int i = 0; i < iNumberOfDelays; i++)
 			{
-				fSummedFilteredTaps += MultipleDelays[i].read(sampleRate, bypassDelayMod, fModRate, fModDepth, fModDelayTime); // Sum the outputs of all delay taps
+				fSummedFilteredTaps += MultipleDelays[i].read(sampleRate, bypassDelayMod, modRate, modDepth, modDelayTime, fDriveOverTime); // Sum the outputs of all delay taps
 			}
 
-			float fWriteValue = input + (fSummedFilteredTaps * fFeedbackGain);
-			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].write(fWriteValue); // Write the same value to all delay taps
+			float fFeedbackValue = fSummedFilteredTaps * fFeedbackGain;
+			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].write(input, fFeedbackValue, fDriveOverTime); // Keep input clean, distort repeats in feedback
 
 			return fSummedFilteredTaps;
 		}
@@ -944,27 +955,22 @@ public:
 				return false;
 			}
 
-			float distortEcho(float input, float drive, float distortionBlend)
-			{
-				float fDistortion = Distortion.softClip(input, drive);
-			}
-
-			float read(float sampleRate, int bypassDelayMod, float fModRate, float fModDepth, float fModDelayTime)
+			float read(float sampleRate, int bypassDelayMod, float modRate, float modDepth, float modDelayTime, float drive)
 			{
 				if (bypassDelayMod == 0)
 				{
-					Mod.setupValues(fModRate);
-					float fDelayOffset = Mod.processOffset(fModDepth, 1); // Get the modulation offset for the delay time
-					fModDelayTime = fModDelayTime + fDelayOffset;
+					Mod.setupValues(modRate);
+					float fDelayOffset = Mod.processOffset(modDepth, 1); // Get the modulation offset for the delay time
+					modDelayTime = modDelayTime + fDelayOffset;
 					Mod.postProcess();
 				}
-				fOutputDelayTime = fDelayTime + fModDelayTime;
+				fOutputDelayTime = fDelayTime + modDelayTime;
 				if (fOutputDelayTime < 0.001f) fOutputDelayTime = 0.001f;
 				if (fOutputDelayTime > 2.0f) fOutputDelayTime = 2.0f;
 				int readPos = iBufferWritePos - (int)(sampleRate * fOutputDelayTime); // Calculate the read position based on the delay time
 				if (readPos < 0) readPos += iBufferSize;
 
-				return LPF.process(pfCircularBuffer[readPos]);
+				return Distortion.softClip(LPF.process(pfCircularBuffer[readPos]), drive);
 			}
 
 			void setTappedDelayTime(float delayTime)
@@ -979,14 +985,10 @@ public:
 				LPF.set(cutoff);
 			}
 
-			float lowPassFilter(float input)
+			void write(float input, float feedback, float drive)
 			{
-				return LPF.process(input);
-			}
-
-			void write(float input)
-			{
-				pfCircularBuffer[iBufferWritePos] = input;
+				float fDistortedFeedback = Distortion.softClip(feedback, drive);
+				pfCircularBuffer[iBufferWritePos] = input + fDistortedFeedback;
 			}
 
 			float samplesToTimeToFrequency(int tapCount, float sampleRate)
@@ -1036,6 +1038,9 @@ public:
 	private:
 		int iNumberOfDelays;
 		float fFeedbackGain;
+		float fDrive;
+		float fDriveEnvelope;
+		float fDriveDecayPerSample;
 	};
 
 	class MyReverb
@@ -1047,11 +1052,11 @@ public:
 				for (int j = 0; j < 4; j++) Delays[i][j].initialiseBuffer(sampleRate);
 		}
 
-		void set(float delayTimes[][4], float feedbackGain, float lpfCutoff, int numDelays)
+		void set(float delayTimes[][4], float feedbackGain, float lpfCutoff, float drive, int numDelays)
 		{
 			iNumberOfDelayGroups = numDelays;
 			for (int i = 0; i < iNumberOfDelayGroups; i++)
-				for (int j = 0; j < 4; j++) Delays[i][j].set(&delayTimes[i][j], feedbackGain, lpfCutoff, 3);
+				for (int j = 0; j < 4; j++) Delays[i][j].set(&delayTimes[i][j], feedbackGain, lpfCutoff, drive, 3);
 		}
 
 		int tapPos(int delayIndex, float time, float sampleRate)
@@ -1063,11 +1068,11 @@ public:
 			return iBufferReadPos;
 		}
 
-		float process(float input, float sampleRate)
+		float process(float input, float sampleRate, float drive)
 		{
 			float fSummedTaps = 0.0f;
 			for (int i = 0; i < iNumberOfDelayGroups; i++)
-				for (int j = 0; j < 4; j++) fSummedTaps += Delays[i][j].process(input, sampleRate, 0, 0.0f, 0.0f, 0.0f);
+				for (int j = 0; j < 4; j++) fSummedTaps += Delays[i][j].process(input, sampleRate, 0, 0.0f, 0.0f, 0.0f, drive);
 			return fSummedTaps;
 		}
 

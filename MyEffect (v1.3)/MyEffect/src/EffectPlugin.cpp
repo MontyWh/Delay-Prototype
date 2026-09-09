@@ -50,8 +50,9 @@ extern "C" {
             {   "Delay Feedback Gain",  Parameter::ROTARY, 0.0f, 0.25f, 0.125f, AUTO_SIZE  },
 
 			{	"LPF Cutoff",  Parameter::ROTARY, 0.0f, 1.0f, 1.0f, AUTO_SIZE },
+			{   "Delay Drive",  Parameter::ROTARY, 1.0f, 4.5f, 1.0f, AUTO_SIZE  },
 
-			{   "Bypass Reverb",  Parameter::TOGGLE, 0, 1, 0, AUTO_SIZE  },			
+			{   "Bypass Reverb",  Parameter::TOGGLE, 0, 1, 1, AUTO_SIZE  },			
 			{   "Reverb Master Time",  Parameter::ROTARY, 0.01f, 0.4f, 0.4f, AUTO_SIZE  },
 
 			{   "Mix",  Parameter::ROTARY, 0.0f, 100.0f, 50.0f, AUTO_SIZE  },
@@ -59,9 +60,9 @@ extern "C" {
         };
 
         const Presets PRESETS = {
-            { "Preset 1", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { "Preset 2", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { "Preset 3", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { "Preset 1", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { "Preset 2", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { "Preset 3", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
         };
 
         return (APDI::Effect*)new MyEffect(CONTROLS, PRESETS);
@@ -149,8 +150,9 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 	float fFeedbackGain = parameters[11];
 	float fLpfCutoff = (20.0f + (pow(parameters[12], 3.0f) * (20000.0f - 20.0f))) / fSampleRate;
+	float fDelayDrive = parameters[13];
 
-	float iBypassReverb = parameters[13];  // 0 = off, 1 = on
+	float iBypassReverb = parameters[14];  // 0 = off, 1 = on
 
 	float fReverbPatterns[3][4];
 	float fReverbEffectTimes[4];
@@ -162,16 +164,16 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 	for (int i = 0; i < 3; i++)
 	{
-		for (int j = 0; j < 4; j++) fReverbEffectTimes[j] = fReverbPatterns[i][j] = parameters[14] * fReverbEffectTimeCoeffs[i][j];
+		for (int j = 0; j < 4; j++) fReverbEffectTimes[j] = fReverbPatterns[i][j] = parameters[15] * fReverbEffectTimeCoeffs[i][j];
 	}
 
-	float fMix = parameters[15] / 100.0f; // Convert from 0-100 to 0-1
-	float fOutputGain = parameters[16];
+	float fMix = parameters[16] / 100.0f; // Convert from 0-100 to 0-1
+	float fOutputGain = parameters[17];
 
 	// Set delay parameters for all channels
 	for (int ch = 0; ch < 2; ch++)
 	{
-		Echo[ch].setupParameters(fDelayEffectTimes, fReverbPatterns, fFeedbackGain, fLpfCutoff, iNumberOfDelays);
+		Echo[ch].setupParameters(fDelayEffectTimes, fReverbPatterns, fFeedbackGain, fLpfCutoff, fDelayDrive, iNumberOfDelays);
 	}
 
 	while (numSamples--)
@@ -184,7 +186,7 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 			float fDry[2], fWet[2];
 			fWet[ch] = fDry[ch] = fIn[ch];
 
-			fWet[ch] = Echo[ch].process(fWet[ch], fSampleRate, iBypassDelay, iBypassDelayMod, iBypassReverb, fModRate, fModDepth, fModDelayTime);
+			fWet[ch] = Echo[ch].process(fWet[ch], fSampleRate, iBypassDelay, iBypassDelayMod, iBypassReverb, fModRate, fModDepth, fModDelayTime, fDelayDrive);
 
 			wetDryBlend(fOut, ch, fWet, fMix, fDry); // Apply wet/dry mix
 			fOut[ch] *= fOutputGain; // Apply output gain
