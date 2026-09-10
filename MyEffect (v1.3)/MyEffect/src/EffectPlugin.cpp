@@ -60,7 +60,7 @@ extern "C" {
 
 			{   "Mix",  Parameter::ROTARY, 0.0f, 100.0f, 50.0f, AUTO_SIZE  },
 			{   "Output Gain",  Parameter::SLIDER, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
-			{   "Stereo Width",  Parameter::ROTARY, 0.0f, 1.0f, 0.1f, AUTO_SIZE  },
+			{   "Stereo Width",  Parameter::ROTARY, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
         };
 
         const Presets PRESETS = {
@@ -78,7 +78,7 @@ MyEffect::MyEffect(const Parameters& parameters, const Presets& presets)
 : Effect(parameters, presets)
 {
 	// Initialise member variables, etc.
-	Echo.initialise(getSampleRate());
+	Stereo.initialise(getSampleRate());
 	fSampleRate = getSampleRate();
 }
 
@@ -107,14 +107,14 @@ void MyEffect::buttonPressed(int iButton)
 
 	if (iButton == 9)
 	{
-		Echo.Echo[0].Delay.setTapTempo(fSampleRate); // Set tap tempo for both channels
-		Echo.Echo[1].Delay.setTapTempo(fSampleRate);
+		Stereo.Echo[0].Delay.setTapTempo(fSampleRate); // Set tap tempo for both channels
+		Stereo.Echo[1].Delay.setTapTempo(fSampleRate);
 
 		int iNumberOfDelays = parameters[6] + 1;
 		if (iNumberOfDelays > 3) iNumberOfDelays = 3;
 		for (int i = 0; i < iNumberOfDelays; i++)
 		{
-			float fUiDelayTime = Echo.Echo[0].Delay.MultipleDelays[i].fDelayTime / 10.0f;
+			float fUiDelayTime = Stereo.Echo[0].Delay.MultipleDelays[i].fDelayTime / 10.0f;
 			if (fUiDelayTime < 0.001f) fUiDelayTime = 0.001f;
 			if (fUiDelayTime > 0.1f) fUiDelayTime = 0.1f;
 			parameters[10 + i] = fUiDelayTime;
@@ -122,9 +122,9 @@ void MyEffect::buttonPressed(int iButton)
 	}
 }
 
-void MyEffect::wetDryBlend(float  output[2], int channel, float  wet[2], float wetDryBlend, float  dry[2])
+void MyEffect::wetDryBlend(float& output, float wet, float wetDryBlend, float dry)
 {
-	output[channel] = wet[channel] * wetDryBlend + dry[channel] * (1.0f - wetDryBlend); // Apply mix
+	output = wet * wetDryBlend + dry * (1.0f - wetDryBlend); // Apply mix
 }
 
 float MyEffect::updateTempoDivisions(int tempoBpm, float tempoOrTime, float delayTime)
@@ -165,10 +165,16 @@ float MyEffect::updateTempoDivisions(int tempoBpm, float tempoOrTime, float dela
 // (inputBuffer contains the input audio, and processed samples should be stored in outputBuffer)
 void MyEffect::process(const float** inputBuffers, float** outputBuffers, int numSamples)
 {
+	if (inputBuffers == nullptr || outputBuffers == nullptr) return;
+	if (inputBuffers[0] == nullptr || outputBuffers[0] == nullptr) return;
+
+	bool bHasRightInput = (inputBuffers[1] != nullptr);
+	bool bHasRightOutput = (outputBuffers[1] != nullptr);
+
 	float fIn[2] = { 0, 0, };
 	float fOut[2] = { 0, 0, };
-	const float* pfInBuffer[2] = { inputBuffers[0], inputBuffers[1] };
-	float *pfOutBuffer[2] = { outputBuffers[0], outputBuffers[1] };
+	const float* pfInBuffer[2] = { inputBuffers[0], bHasRightInput ? inputBuffers[1] : inputBuffers[0] };
+	float* pfOutBuffer[2] = { outputBuffers[0], bHasRightOutput ? outputBuffers[1] : outputBuffers[0] };
 
 	float fInputGain = pow(parameters[0], 3.0f);
 
@@ -211,10 +217,10 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 
 	float fMix = parameters[19] / 100.0f; // Convert from 0-100 to 0-1
 	float fOutputGain = parameters[20];
-	float fStereoWidth = parameters[21]; // 0.0-1.0 cross-channel width
+	float fStereoWidth = parameters[21]; // 0.0 = mono, 1.0 = normal stereo, 2.0 = extra wide
 
 	// Set delay parameters for both channels
-	Echo.setupParameters(fDelayEffectTimes, fReverbPatterns, fFeedbackGain, fLpfCutoff, fDelayDrive, fDiffusion, iNumberOfDelays);
+	Stereo.configure(fDelayEffectTimes, fReverbPatterns, fFeedbackGain, fLpfCutoff, fDelayDrive, fDiffusion, iNumberOfDelays);
 
 	while (numSamples--)
 	{
@@ -225,17 +231,17 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 		float fDry[2], fWet[2];
 		for (int ch = 0; ch < 2; ch++) fWet[ch] = fDry[ch] = fIn[ch];
 
-		Echo.processStereo(fDry[0], fDry[1], fSampleRate, iBypassDelay, iBypassDelayMod, iBypassReverb, fModRate, fModDepth, fModDelayTime, fDelayDrive, fStereoWidth, fWet[0], fWet[1]);
+		Stereo.process(fDry[0], fDry[1], fSampleRate, iBypassDelay, iBypassDelayMod, iBypassReverb, fModRate, fModDepth, fModDelayTime, fDelayDrive, fStereoWidth, fWet[0], fWet[1]);
 
 		for (int ch = 0; ch < 2; ch++)
 		{
-			wetDryBlend(fOut, ch, fWet, fMix, fDry); // Apply wet/dry mix
+			wetDryBlend(fOut[ch], fWet[ch], fMix, fDry[ch]); // Apply mix
 			fOut[ch] *= fOutputGain; // Apply output gain
-
-			// Copy result to output
-			*pfOutBuffer[ch]++ = fOut[ch];
 		}
 
-		Echo.postProcess();
+		*pfOutBuffer[0]++ = fOut[0];
+		if (bHasRightOutput) *pfOutBuffer[1]++ = fOut[1];
+
+		Stereo.postProcess();
 	}
 }
