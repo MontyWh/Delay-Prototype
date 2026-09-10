@@ -116,9 +116,9 @@ void MyEffect::buttonPressed(int iButton)
 		if (iNumberOfDelays > 3) iNumberOfDelays = 3;
 
 		float fTempoOrTime = parameters[7];
+		int iTapTempoBpm = (fTempoOrTime == 1.0f) ? 60 : (int)parameters[8];
 		float fTapDelayTime = Echo[0].Delay.MultipleDelays[0].fDelayTime;
-		float fUiDelayTime1 = fTapDelayTime / 10.0f;
-		if (fTempoOrTime == 1.0f) fUiDelayTime1 = fTapDelayTime / 20.0f;
+		float fUiDelayTime1 = updateTempoDivisions(iTapTempoBpm, 0.0f, fTapDelayTime / 10.0f);
 		if (fUiDelayTime1 < 0.001f) fUiDelayTime1 = 0.001f;
 		if (fUiDelayTime1 > 0.2f) fUiDelayTime1 = 0.2f;
 		parameters[10] = fUiDelayTime1;

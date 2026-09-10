@@ -14,5 +14,5 @@
 - User prefers requested function creation without automatic wiring/linking into processing flow; they will connect it manually.
 - User wants tempo mode delay times to remain flexible/user-adjustable and not be fixed in place by tap tempo or continuous parameter overwrites.
 - User prefers grouped taps for tap-tempo behavior, accepting 2-4 taps, with delay time clamped to a maximum of 2.0 seconds, and automatic tap-group reset after 3 seconds of inactivity to avoid springy behavior.
-- User prefers level matching between delay on/off by preserving clean dry signal path and not using compression-based loudness processing.
+- Tap tempo and tap time should use the same tap-logic path; only BPM source differs: tempo mode uses Tempo control, time mode uses fixed 60 BPM.
 - Never delete files as a workaround for edit conflicts. Always exhaust careful surgical edits first—split the problematic change into smaller, unique replaces; use git to understand what went wrong; or ask for clarification. Deleting and restoring from git should be an absolute last resort only after confirming no other option works, especially for large files with complex structure where the cost of loss is high.
