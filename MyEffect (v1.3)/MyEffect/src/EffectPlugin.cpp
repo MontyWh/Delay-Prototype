@@ -58,9 +58,10 @@ extern "C" {
 			{   "Reverb Master Time",  Parameter::ROTARY, 0.01f, 0.4f, 0.4f, AUTO_SIZE  },
 			{   "Diffusion",  Parameter::ROTARY, 0.0f, 1.0f, 0.65f, AUTO_SIZE  },
 
+			{   "Stereo Width",  Parameter::ROTARY, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
+
 			{   "Mix",  Parameter::ROTARY, 0.0f, 100.0f, 50.0f, AUTO_SIZE  },
 			{   "Output Gain",  Parameter::SLIDER, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
-			{   "Stereo Width",  Parameter::ROTARY, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
         };
 
         const Presets PRESETS = {
@@ -124,7 +125,9 @@ void MyEffect::buttonPressed(int iButton)
 
 void MyEffect::wetDryBlend(float& output, float wet, float wetDryBlend, float dry)
 {
-	output = wet * wetDryBlend + dry * (1.0f - wetDryBlend); // Apply mix
+	float fDryGain = cos(wetDryBlend * M_PI * 0.5f);
+	float fWetGain = sin(pow(wetDryBlend, 2.0f) * M_PI * 0.5f);
+	output = dry * fDryGain + wet * fWetGain; // Apply mix
 }
 
 float MyEffect::updateTempoDivisions(int tempoBpm, float tempoOrTime, float delayTime)
@@ -215,9 +218,10 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 	}
 	float fDiffusion = parameters[18];
 
-	float fMix = parameters[19] / 100.0f; // Convert from 0-100 to 0-1
-	float fOutputGain = parameters[20];
-	float fStereoWidth = parameters[21]; // 0.0 = mono, 1.0 = normal stereo, 2.0 = extra wide
+	float fStereoWidth = parameters[19]; // 0.0 = mono, 1.0 = normal stereo, 2.0 = extra wide
+
+	float fMix = parameters[20] / 100.0f; // Convert from 0-100 to 0-1
+	float fOutputGain = parameters[21];
 
 	// Set delay parameters for both channels
 	Stereo.configure(fDelayEffectTimes, fReverbPatterns, fFeedbackGain, fLpfCutoff, fDelayDrive, fDiffusion, iNumberOfDelays);
