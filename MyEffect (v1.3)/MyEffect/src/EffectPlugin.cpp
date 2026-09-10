@@ -55,8 +55,8 @@ extern "C" {
 			{   "Delay Drive",  Parameter::ROTARY, 1.0f, 4.5f, 1.0f, AUTO_SIZE  },
 
 			{   "Bypass Reverb",  Parameter::TOGGLE, 0, 1, 1, AUTO_SIZE  },			
-			{   "Reverb Master Time",  Parameter::ROTARY, 0.01f, 0.4f, 0.4f, AUTO_SIZE  },
-			{   "Diffusion",  Parameter::ROTARY, 0.0f, 1.0f, 0.65f, AUTO_SIZE  },
+			{   "Reverb Master Time",  Parameter::ROTARY, 0.01f, 0.4f, 0.1f, AUTO_SIZE  },
+			{   "Diffusion",  Parameter::ROTARY, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
 
 			{   "Mix",  Parameter::ROTARY, 0.0f, 100.0f, 50.0f, AUTO_SIZE  },
 			{   "Output Gain",  Parameter::SLIDER, 0.0f, 1.0f, 1.0f, AUTO_SIZE  },
@@ -143,7 +143,9 @@ void MyEffect::buttonPressed(int iButton)
 
 void MyEffect::wetDryBlend(float  output[2], int channel, float  wet[2], float wetDryBlend, float  dry[2])
 {
-	output[channel] = wet[channel] * wetDryBlend + dry[channel] * (1.0f - wetDryBlend); // Apply mix
+	float fWetGain = sqrtf(wetDryBlend);
+	float fDryGain = sqrtf(1.0f - wetDryBlend);
+	output[channel] = wet[channel] * fWetGain + dry[channel] * fDryGain; // Apply mix
 }
 
 float MyEffect::updateTempoDivisions(int tempoBpm, float tempoOrTime, float delayTime)

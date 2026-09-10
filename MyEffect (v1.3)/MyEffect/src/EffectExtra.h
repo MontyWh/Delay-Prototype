@@ -805,10 +805,13 @@ public:
 
 	float process(float input, float sampleRate, int bypassDelay, int bypassDelayMod, int bypassReverb, float modRate, float modDepth, float modDelayTime, float drive)
 	{
-		if (bypassDelay == 0) input = Delay.process(input, sampleRate, bypassDelayMod, modRate, modDepth, modDelayTime, drive);
-		if (bypassReverb == 0) input = Reverb.process(input, sampleRate, drive);
+		float fDelay = 0.0f;
+		float fReverb = 0.0f;
+		if (bypassDelay == 0) fDelay = Delay.process(input, sampleRate, bypassDelayMod, modRate, modDepth, modDelayTime, drive);
+		if (bypassReverb == 0) fReverb = Reverb.process(input + fDelay, sampleRate, drive) * 0.75f;
 
-		return input;
+		if (bypassDelay == 1 && bypassReverb == 1) return input;
+		return fDelay + fReverb;
 	}
 
 	void postProcess()
@@ -875,7 +878,7 @@ public:
 			float fFeedbackValue = fSummedFilteredTaps * fFeedbackGain;
 			for (int i = 0; i < iNumberOfDelays; i++) MultipleDelays[i].write(input, fFeedbackValue, fDriveOverTime); // Keep input clean, distort repeats in feedback
 
-			return input + fSummedFilteredTaps;
+			return fSummedFilteredTaps;
 		}
 
 		void tapTempoPost()
@@ -1155,7 +1158,7 @@ public:
 				float fSummedTaps = 0.0f;
 				for (int i = 0; i < iNumberOfDelayGroups; i++)
 					for (int j = 0; j < 4; j++) fSummedTaps += Delays[i][j].process(input, sampleRate, 0, 0.0f, 0.0f, 0.0f, drive);
-				return fSummedTaps;
+				return fSummedTaps * 0.25f;
 			}
 
 			void postProcess()
