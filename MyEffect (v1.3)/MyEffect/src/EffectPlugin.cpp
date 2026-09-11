@@ -239,10 +239,36 @@ void MyEffect::process(const float** inputBuffers, float** outputBuffers, int nu
 	float fMix = parameters[19] / 100.0f; // Convert from 0-100 to 0-1
 	float fOutputGain = parameters[20];
 
-	// Set delay parameters for all channels
-	for (int ch = 0; ch < 2; ch++)
+	float fEchoSetupValues[12] = {
+		parameters[6], parameters[7], parameters[8],
+		parameters[10], parameters[11], parameters[12],
+		parameters[13], parameters[14], parameters[15],
+		parameters[17], parameters[18], fSampleRate
+	};
+
+	bool bEchoSetupChanged = !bEchoSetupInitialised;
+	if (!bEchoSetupChanged)
 	{
-		Echo[ch].setupParameters(fDelayEffectTimes, fReverbPatterns, fFeedbackGain, fLpfCutoff, fDelayDrive, fDiffusion, iNumberOfDelays);
+		for (int i = 0; i < 12; i++)
+		{
+			if (fEchoSetupCache[i] != fEchoSetupValues[i])
+			{
+				bEchoSetupChanged = true;
+				break;
+			}
+		}
+	}
+
+	if (bEchoSetupChanged)
+	{
+		// Set delay parameters for all channels
+		for (int ch = 0; ch < 2; ch++)
+		{
+			Echo[ch].setupParameters(fDelayEffectTimes, fReverbPatterns, fFeedbackGain, fLpfCutoff, fDelayDrive, fDiffusion, iNumberOfDelays);
+		}
+
+		for (int i = 0; i < 12; i++) fEchoSetupCache[i] = fEchoSetupValues[i];
+		bEchoSetupInitialised = true;
 	}
 
 	while (numSamples--)

@@ -36,7 +36,7 @@ public:
 private:
 	// Declare shared member variables here
 
-    float updateTempoDivisions(int tempoBpm, float tempoOrTime, float delayTime);
+	float updateTempoDivisions(int tempoBpm, float tempoOrTime, float delayTime);
 
 	MyEcho Echo[2]; // Two instances of MyEcho for stereo processing
 	float fDelayEffectTimes[3];
@@ -44,4 +44,7 @@ private:
 	float fSampleRate;
 
 	float fCrotchet, fQuaver, fSemiQuaver;
+
+	bool bEchoSetupInitialised = false;
+	float fEchoSetupCache[12] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
 };

@@ -1227,7 +1227,8 @@ public:
 			for (int i = 0; i < 4; i++)
 			{
 				float fBlockInput = input;
-				if (pfEchoBlockBuffers[i] != nullptr && iEchoBlockBufferSize > 1)
+				float* pfBuffer = pfEchoBlockBuffers[i];
+				if (pfBuffer != nullptr && iEchoBlockBufferSize > 1)
 				{
 					if (iEchoBlockWritePos[i] < 0 || iEchoBlockWritePos[i] >= iEchoBlockBufferSize) iEchoBlockWritePos[i] = 0;
 
@@ -1239,8 +1240,8 @@ public:
 					while (iReadPos < 0) iReadPos += iEchoBlockBufferSize;
 					if (iReadPos >= iEchoBlockBufferSize) iReadPos = iReadPos % iEchoBlockBufferSize;
 
-					fBlockInput = pfEchoBlockBuffers[i][iReadPos];
-					pfEchoBlockBuffers[i][iEchoBlockWritePos[i]] = input;
+					fBlockInput = pfBuffer[iReadPos];
+					pfBuffer[iEchoBlockWritePos[i]] = input;
 
 					iEchoBlockWritePos[i]++;
 					if (iEchoBlockWritePos[i] >= iEchoBlockBufferSize) iEchoBlockWritePos[i] = 0;
